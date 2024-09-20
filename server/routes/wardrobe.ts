@@ -7,28 +7,32 @@ const fakeClothes: Clothes[]  = [
     {
         id: 1,
         name: "T-Shirt",
+        type: "Top",
         color: "Blue",
-        size: "M"
+        size: "M",
     },
     {
         id: 2,
         name: "Jeans",
+        type: 'Bottom',
         color: "Black",
-        size: "L"
+        size: "L",
     },
     {
         id: 3,
         name: "Dress",
+        type: 'Dress',
         color: "Red",
-        size: "S"
+        size: "S",
     }
 ]
 
 const clothesSchema = z.object({
     id: z.number().int().positive().min(1),
     name: z.string(),
+    type: z.string(),
+    size: z.string(),
     color: z.string(),
-    size: z.string()
 })
 
 type Clothes = z.infer<typeof clothesSchema>
@@ -45,7 +49,7 @@ export const wardrobeRoute = new Hono()
         c.status(201)
         return c.json({clothes});
     })
-    .get('/total-clothes', c => {
+    .get('/total-items', async (c) => {
         return c.json({ totalClothes: fakeClothes.length })
     })
     .get('/:id{[0-9]+}', c => {

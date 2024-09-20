@@ -1,7 +1,7 @@
 export interface Clothes {
     id: number;
     name: string;
-    // type: string;
+    type: string;
     // brand?: string;
     size: string;
     color: string;
