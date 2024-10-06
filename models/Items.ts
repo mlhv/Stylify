@@ -1,4 +1,4 @@
-export interface Clothes {
+export interface Items {
     id: number;
     name: string;
     type: string;

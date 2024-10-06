@@ -1,19 +1,26 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
 import { useForm } from '@tanstack/react-form'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 
-import { api } from '@/lib/api'
+import { createItem, getAllItemsQueryOptions, loadingCreateItemQueryOptions } from '@/lib/api'
+import { useQueryClient } from '@tanstack/react-query'
 
-export const Route = createFileRoute('/create-item')({
+import { zodValidator } from '@tanstack/zod-form-adapter'
+
+import { createItemSchema } from '@server/sharedTypes'
+
+export const Route = createFileRoute('/_authenticated/create-item')({
   component: CreateItem,
 })
 
 function CreateItem() {
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const form = useForm({
+    validatorAdapter: zodValidator(),
     defaultValues: {
       name: '',
       type: '',
@@ -21,11 +28,35 @@ function CreateItem() {
       color: '',
     },
     onSubmit: async ({ value }) => {
-      const res = await api.wardrobe.$post({ json: value });
-      if (!res.ok) {
-        throw new Error("Network response was not ok");
+      const existingItems = await queryClient.ensureQueryData(getAllItemsQueryOptions)
+      
+      navigate({ to: '/items' })
+
+      //loading state
+      queryClient.setQueryData(loadingCreateItemQueryOptions.queryKey, {item: value})
+
+      try {
+        const newItem = await createItem({ value });
+
+        queryClient.setQueryData(getAllItemsQueryOptions.queryKey, {
+          ...existingItems,
+          items: [newItem, ...existingItems.items],
+        });
+        toast('Item Created', {
+          description: `Successfully created a new item: ${newItem.name}`,
+          }
+        )
+        //success state
+      } catch (error) {
+        //error state
+        toast('An error occurred', {
+          description: `Failed to create a new item`
+        })
+      } finally {
+        //clean up loading state
+        queryClient.setQueryData(loadingCreateItemQueryOptions.queryKey, {})
       }
-      navigate({to: '/items'})
+      
     },
   })
 
@@ -34,9 +65,9 @@ function CreateItem() {
       <h1 className="text-2xl font-bold mb-4">Add Clothing Item</h1>
       <form
         onSubmit={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          form.handleSubmit();
+          e.preventDefault()
+          e.stopPropagation()
+          form.handleSubmit()
         }}
         className="space-y-4"
       >
@@ -44,12 +75,7 @@ function CreateItem() {
           <form.Field
             name="name"
             validators={{
-              onChange: ({ value }) =>
-                !value
-                  ? 'Name is required'
-                  : value.length < 2
-                  ? 'Name must be at least 2 characters'
-                  : undefined,
+              onChange: createItemSchema.shape.name, 
             }}
           >
             {(field) => (
@@ -65,8 +91,9 @@ function CreateItem() {
                   onChange={(e) => field.handleChange(e.target.value)}
                   className="w-full px-3 py-2 border rounded"
                 />
-                {field.state.meta.isTouched && field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(", ")}</em>
+                {field.state.meta.isTouched &&
+                field.state.meta.errors.length ? (
+                  <em>{field.state.meta.errors.join(', ')}</em>
                 ) : null}
               </>
             )}
@@ -76,8 +103,7 @@ function CreateItem() {
           <form.Field
             name="type"
             validators={{
-              onChange: ({ value }) =>
-                !value ? 'Type is required' : undefined,
+              onChange: createItemSchema.shape.type,
             }}
           >
             {(field) => (
@@ -93,8 +119,9 @@ function CreateItem() {
                   onChange={(e) => field.handleChange(e.target.value)}
                   className="w-full px-3 py-2 border rounded"
                 />
-                {field.state.meta.isTouched && field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(", ")}</em>
+                {field.state.meta.isTouched &&
+                field.state.meta.errors.length ? (
+                  <em>{field.state.meta.errors.join(', ')}</em>
                 ) : null}
               </>
             )}
@@ -104,8 +131,7 @@ function CreateItem() {
           <form.Field
             name="size"
             validators={{
-              onChange: ({ value }) =>
-                !value ? 'Size is required' : undefined,
+              onChange: createItemSchema.shape.size,
             }}
           >
             {(field) => (
@@ -121,8 +147,9 @@ function CreateItem() {
                   onChange={(e) => field.handleChange(e.target.value)}
                   className="w-full px-3 py-2 border rounded"
                 />
-                {field.state.meta.isTouched && field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(", ")}</em>
+                {field.state.meta.isTouched &&
+                field.state.meta.errors.length ? (
+                  <em>{field.state.meta.errors.join(', ')}</em>
                 ) : null}
               </>
             )}
@@ -132,8 +159,7 @@ function CreateItem() {
           <form.Field
             name="color"
             validators={{
-              onChange: ({ value }) =>
-                !value ? 'Color is required' : undefined,
+              onChange: createItemSchema.shape.color,
             }}
           >
             {(field) => (
@@ -149,8 +175,9 @@ function CreateItem() {
                   onChange={(e) => field.handleChange(e.target.value)}
                   className="w-full px-3 py-2 border rounded"
                 />
-                {field.state.meta.isTouched && field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(", ")}</em>
+                {field.state.meta.isTouched &&
+                field.state.meta.errors.length ? (
+                  <em>{field.state.meta.errors.join(', ')}</em>
                 ) : null}
               </>
             )}
@@ -180,5 +207,5 @@ function CreateItem() {
         </form.Subscribe>
       </form>
     </div>
-  );
+  )
 }

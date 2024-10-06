@@ -1,71 +1,79 @@
 import { Hono } from 'hono'
-import { z } from 'zod'
 import { zValidator } from '@hono/zod-validator'
-import type { Clothes } from '../../models/Clothes'
+import type { Items } from '../../models/Items'
+import { getUser } from '../kinde'
 
-const fakeClothes: Clothes[]  = [
-    {
-        id: 1,
-        name: "T-Shirt",
-        type: "Top",
-        color: "Blue",
-        size: "M",
-    },
-    {
-        id: 2,
-        name: "Jeans",
-        type: 'Bottom',
-        color: "Black",
-        size: "L",
-    },
-    {
-        id: 3,
-        name: "Dress",
-        type: 'Dress',
-        color: "Red",
-        size: "S",
-    }
-]
+import { db } from '../db'
+import { items as itemTable, insertItemsSchema } from '../db/schema/items'
+import { eq, desc, and, count } from 'drizzle-orm'
 
-const clothesSchema = z.object({
-    id: z.number().int().positive().min(1),
-    name: z.string(),
-    type: z.string(),
-    size: z.string(),
-    color: z.string(),
-})
-
-type Clothes = z.infer<typeof clothesSchema>
-
-const createClothesSchema = clothesSchema.omit({ id: true })
+import { createItemSchema } from '../sharedTypes'
 
 export const wardrobeRoute = new Hono()
-    .get('/', c => {
-        return c.json({ clothes: fakeClothes})
+    .get('/', getUser, async (c) => {
+        const user = c.var.user
+        const items = await db
+        .select()
+        .from(itemTable)
+        .where(eq(itemTable.userId, user.id,))
+        .orderBy(desc(itemTable.createdAt))
+        .limit(100)
+
+        return c.json({ items: items})
     })
-    .post('/', zValidator("json", createClothesSchema), async (c) => {
-        const clothes = await c.req.valid("json")
-        fakeClothes.push({...clothes, id: fakeClothes.length + 1})
+    .post('/', getUser, zValidator("json", createItemSchema), async (c) => {
+        const item = await c.req.valid("json")
+        const user = c.var.user
+
+        const validatedItem = insertItemsSchema.parse({
+            ...item,
+            userId: user.id,
+        })
+
+        const result = await db
+        .insert(itemTable)
+        .values(validatedItem)
+        .returning()
+        .then(res => res[0])
+
         c.status(201)
-        return c.json({clothes});
+        return c.json(result);
     })
-    .get('/total-items', async (c) => {
-        return c.json({ totalClothes: fakeClothes.length })
+    .get('/total-items', getUser, async (c) => {
+        const user = c.var.user
+        const result = await db
+        .select({ total: count(itemTable.id) })
+        .from(itemTable)
+        .where(eq(itemTable.userId, user.id))
+        .limit(1)
+        .then(res => res[0])
+        return c.json(result)
     })
-    .get('/:id{[0-9]+}', c => {
+    .get('/:id{[0-9]+}', getUser, async (c) => {
         const id = Number.parseInt(c.req.param('id'));
-        const clothes = fakeClothes.find(clothes => clothes.id === id)
-        if (!clothes) {
+        const user = c.var.user
+        const item = await db
+        .select()
+        .from(itemTable)
+        .where(and(eq(itemTable.userId, user.id), eq(itemTable.id, id)))
+        .then(res => res[0])
+
+        if (!item) {
             return c.notFound()
         }
-        return c.json({ clothes })
+        return c.json({ item })
     })
-    .delete('/:id{[0-9]+}', c => {
+    .delete('/:id{[0-9]+}', getUser, async (c) => {
         const id = Number.parseInt(c.req.param('id'));
-        const index = fakeClothes.findIndex(clothes => clothes.id === id)
-        if (index === -1) { 
+        const user = c.var.user
+        const item = await db
+        .delete(itemTable)
+        .where(and(eq(itemTable.userId, user.id), eq(itemTable.id, id)))
+        .returning()
+        .then(res => res[0])
+
+        if (!item) {
             return c.notFound()
         }
-        const deletedClothes = fakeClothes.splice(index, 1)[0];
-        return c.json({ clothes: deletedClothes })
+        return c.json({ item })
     });
