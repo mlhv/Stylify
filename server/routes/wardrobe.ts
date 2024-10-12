@@ -1,6 +1,5 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
-import type { Items } from '../../models/Items'
 import { getUser } from '../kinde'
 
 import { db } from '../db'

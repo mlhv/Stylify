@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button'
 import { Trash } from 'lucide-react'
 
 import { toast } from 'sonner'
-import { items } from '@server/db/schema/items'
 
 export const Route = createFileRoute('/_authenticated/items')({
   component: Items,
@@ -32,7 +31,7 @@ function Items() {
               <Card key={item.id} className="flex flex-col overflow-hidden">
                 <CardHeader className="p-0">
                   <img
-                    src={item.image}
+                    src={item.imageUrl}
                     alt={item.name}
                     className="w-full h-48 object-cover"
                   />

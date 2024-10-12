@@ -15,6 +15,13 @@
       "when": 1726871850743,
       "tag": "0001_dapper_hulk",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1728713356898,
+      "tag": "0002_dry_white_tiger",
+      "breakpoints": true
     }
   ]
 }

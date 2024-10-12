@@ -62,3 +62,12 @@ export async function deleteItem({ id }: { id: number }) {
   }
   return
 }
+
+export async function getSignedURL() {
+  const res = await api.upload.$get()
+  if (!res.ok) {
+    throw new Error('Network response was not ok')
+  }
+  const data = res.json()
+  return data
+}

@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label'
 import { useForm } from '@tanstack/react-form'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { useState } from 'react'
 
 import { createItem, getAllItemsQueryOptions, loadingCreateItemQueryOptions } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
@@ -19,6 +20,8 @@ export const Route = createFileRoute('/_authenticated/create-item')({
 function CreateItem() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const [image, setImage] = useState<File | undefined>(undefined)
+  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined)
   const form = useForm({
     validatorAdapter: zodValidator(),
     defaultValues: {
@@ -26,6 +29,7 @@ function CreateItem() {
       type: '',
       size: '',
       color: '',
+      imageUrl: '',
     },
     onSubmit: async ({ value }) => {
       const existingItems = await queryClient.ensureQueryData(getAllItemsQueryOptions)
@@ -36,6 +40,8 @@ function CreateItem() {
       queryClient.setQueryData(loadingCreateItemQueryOptions.queryKey, {item: value})
 
       try {
+        // Handle image upload
+
         const newItem = await createItem({ value });
 
         queryClient.setQueryData(getAllItemsQueryOptions.queryKey, {
@@ -46,7 +52,7 @@ function CreateItem() {
           description: `Successfully created a new item: ${newItem.name}`,
           }
         )
-        //success state
+        console.log({newItem, image})
       } catch (error) {
         //error state
         toast('An error occurred', {
@@ -59,6 +65,22 @@ function CreateItem() {
       
     },
   })
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const image = e.target.files?.[0]
+    setImage(image)
+
+    if(imageUrl) {
+      URL.revokeObjectURL(imageUrl)
+    }
+
+    if (image) {
+      const url = URL.createObjectURL(image)
+      setImageUrl(url)
+    } else {
+      setImageUrl(undefined)
+    }
+  }
 
   return (
     <div className="max-w-md mx-auto mt-8">
@@ -183,29 +205,78 @@ function CreateItem() {
             )}
           </form.Field>
         </div>
-        <form.Subscribe
-          selector={(state) => [state.canSubmit, state.isSubmitting]}
-        >
-          {([canSubmit, isSubmitting]) => (
-            <div className="flex space-x-4">
-              <Button
-                type="submit"
-                disabled={!canSubmit}
-                className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-              >
-                {isSubmitting ? '...' : 'Submit'}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => form.reset()}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                Reset
-              </Button>
+
+          {imageUrl && image && (
+            <div className='flex gap-4 items-center'>
+              {image.type.startsWith('image/') ? (
+                <div className='rounded-lg overflow-hidden w-24 h-24 relative'>
+                  <img
+                    className='object-cover'
+                    src={imageUrl}
+                    alt={image.name}
+                  />
+                </div>
+              ) : (
+                <div className='rounded-lg overflow-hidden w-24 h-24 flex items-center justify-center bg-gray-200 text-gray-600'>
+                  <span>Invalid image</span>
+              </div>
+            )}
+
+            <Button
+              type="button"
+              onClick={() => {
+                setImage(undefined)
+                setImageUrl(undefined)
+              }}
+              className="px-4 py-2 bg-gray-300 rounded"
+            >
+              Remove
+                  </Button>
+                </div>
+              )}
+    
+            <div>
+              <Label htmlFor="image" className="block mb-1">
+                Image:
+              </Label>
+              <Input
+                id="image"
+                name="image"
+                type="file"
+                accept="image/*"
+                onChange={handleImageChange}
+                className="w-full px-3 py-2 border rounded"
+              />
             </div>
-          )}
-        </form.Subscribe>
-      </form>
-    </div>
-  )
-}
+    
+            <form.Subscribe
+              selector={(state) => [state.canSubmit, state.isSubmitting]}
+            >
+              {([canSubmit, isSubmitting]) => (
+                <div className="flex space-x-4">
+                  <Button
+                    type="submit"
+                    disabled={!canSubmit}
+                    className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
+                  >
+                    {isSubmitting ? '...' : 'Submit'}
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      form.reset()
+                      setImage(undefined)
+                    }}
+                    className="px-4 py-2 bg-gray-300 rounded"
+                  >
+                    Reset
+                  </Button>
+                </div>
+              )}
+            </form.Subscribe>
+          </form>
+        </div>
+      )
+    }
+  
+
