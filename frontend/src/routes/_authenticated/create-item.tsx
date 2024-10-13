@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useState } from 'react'
 
-import { createItem, getAllItemsQueryOptions, loadingCreateItemQueryOptions } from '@/lib/api'
+import { createItem, getAllItemsQueryOptions, loadingCreateItemQueryOptions, getSignedURL } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { zodValidator } from '@tanstack/zod-form-adapter'
@@ -41,8 +41,28 @@ function CreateItem() {
 
       try {
         // Handle image upload
+        let uploadedImageUrl = ''
+        if (image) {
+          const { signedURL } = await getSignedURL()
+          const res = await fetch(signedURL, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': image.type,
+            },
+            body: image,
+          })
+          if (!res.ok) {
+            throw new Error('Failed to upload image')
+          }
+          uploadedImageUrl = signedURL.split('?')[0]
+        }
 
-        const newItem = await createItem({ value });
+        const newItem = await createItem({
+          value: {
+            ...value,
+            imageUrl: uploadedImageUrl,
+          }
+          });
 
         queryClient.setQueryData(getAllItemsQueryOptions.queryKey, {
           ...existingItems,
@@ -52,7 +72,7 @@ function CreateItem() {
           description: `Successfully created a new item: ${newItem.name}`,
           }
         )
-        console.log({newItem, image})
+        console.log({newItem, imageUrl})
       } catch (error) {
         //error state
         toast('An error occurred', {

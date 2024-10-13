@@ -64,10 +64,15 @@ export async function deleteItem({ id }: { id: number }) {
 }
 
 export async function getSignedURL() {
-  const res = await api.upload.$get()
+  const res = await api['signed-url'].$get()
   if (!res.ok) {
     throw new Error('Network response was not ok')
   }
-  const data = res.json()
+  const data = await res.json()
   return data
 }
+
+export const getSignedURLQueryOptions = queryOptions({
+    queryKey: ['get-signed-url'],
+    queryFn: getSignedURL,
+})
