@@ -21,28 +21,42 @@ export const userQueryOptions = queryOptions({
     queryFn: getCurrentUser,
     staleTime: Infinity
 })
-
-export async function getAllItems() {
-  const res = await api.wardrobe.$get()
-  if (!res.ok) {
-    throw new Error('Network response was not ok')
-  }
-  const data = res.json()
-  return data
+  
+export async function getTotalCLothes() {
+      const res = await api.wardrobe['total-items'].$get()
+      if (!res.ok) {
+        throw new Error('Network response was not ok')
+      }
+      const data = res.json()
+      return data
 }
 
+export const getTotalClothesQueryOptions = queryOptions({
+    queryKey: ['get-total-clothes'],
+    queryFn: getTotalCLothes,
+    staleTime: 1000 * 60 * 5,
+})
+
+export async function getAllItems() {
+    const res = await api.wardrobe.$get()
+    if (!res.ok) {
+      throw new Error('Network response was not ok')
+    }
+    const data = res.json()
+    return data
+}
+  
 export const getAllItemsQueryOptions = queryOptions({
     queryKey: ['get-all-items'],
     queryFn: getAllItems,
     staleTime: 1000 * 60 * 5,
 })
-
+  
 export async function createItem({ value} : { value: createItem }) {
-  const res = await api.wardrobe.$post({ json: value })
-  if (!res.ok) {
+    const res = await api.wardrobe.$post({ json: value })
+    if (!res.ok) {
     throw new Error('Network response was not ok')
   }
-  
   const newItem = await res.json()
   return newItem
 }

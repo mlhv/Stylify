@@ -10,6 +10,8 @@ const s3 = new S3Client({
     }
 });
 
+const maxFileSize = 1024 * 1024 * 10; // 10 MB
+
 export const signedUrlRoute = new Hono()
     .get('/', async (c) => {
         try {

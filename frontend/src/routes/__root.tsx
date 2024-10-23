@@ -29,9 +29,6 @@ function NavBar() {
         <Link to="/about" className="text-lg font-medium hover:underline underline-offset-4" >
           About
         </Link>
-        <Link to="/items" className="text-lg font-medium hover:underline underline-offset-4">
-          Items
-        </Link>
         <Link to="/create-item" className="text-lg font-medium hover:underline underline-offset-4">
           Create
         </Link>
@@ -54,9 +51,6 @@ function NavBar() {
             <Link to="/about" className="text-lg font-medium hover:underline underline-offset-4">
               About
             </Link>
-            <Link to="/items" className="text-lg font-medium hover:underline underline-offset-4">
-              Items
-            </Link>
             <Link to="/create-item" className="text-lg font-medium hover:underline underline-offset-4">
               Create
             </Link>
@@ -69,26 +63,6 @@ function NavBar() {
     </div>
   )
 }
-    // return (
-    //     <div className="p-2 flex gap-2">
-    //     <Link to="/" className="[&.active]:font-bold">
-    //       Home
-    //     </Link>{' '}
-    //     <Link to="/about" className="[&.active]:font-bold">
-    //       About
-    //     </Link>
-    //     <Link to="/items" className="[&.active]:font-bold">
-    //       Items
-    //     </Link>
-    //     <Link to="/create-item" className="[&.active]:font-bold">
-    //       Create
-    //     </Link>
-    //     <Link to="/profile" className="[&.active]:font-bold">
-    //       Profile
-    //     </Link>
-    //   </div>
-    // )
-
 
 function Root() {
     return (

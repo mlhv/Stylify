@@ -34,7 +34,7 @@ function CreateItem() {
     onSubmit: async ({ value }) => {
       const existingItems = await queryClient.ensureQueryData(getAllItemsQueryOptions)
       
-      navigate({ to: '/items' })
+      navigate({ to: '/' })
 
       //loading state
       queryClient.setQueryData(loadingCreateItemQueryOptions.queryKey, {item: value})

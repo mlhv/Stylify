@@ -8,6 +8,17 @@ import { eq, desc, and, count } from 'drizzle-orm'
 
 import { createItemSchema } from '../sharedTypes'
 
+import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+
+
+const s3 = new S3Client({
+    region: process.env.AWS_BUCKET_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY!,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!
+    }
+});
+
 export const wardrobeRoute = new Hono()
     .get('/', getUser, async (c) => {
         const user = c.var.user
@@ -74,5 +85,17 @@ export const wardrobeRoute = new Hono()
         if (!item) {
             return c.notFound()
         }
+        // Delete image from S3
+        const deleteObjectCommand = new DeleteObjectCommand({
+            Bucket: process.env.AWS_BUCKET_NAME!,
+            Key: item.imageUrl.split('/').pop()!,
+        });
+        
+        try {
+            await s3.send(deleteObjectCommand);
+        } catch (error) {
+            console.error('Error deleting object from S3:', error);
+        }
+
         return c.json({ item })
     });
