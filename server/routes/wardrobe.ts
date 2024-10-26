@@ -90,7 +90,7 @@ export const wardrobeRoute = new Hono()
             Bucket: process.env.AWS_BUCKET_NAME!,
             Key: item.imageUrl.split('/').pop()!,
         });
-        
+
         try {
             await s3.send(deleteObjectCommand);
         } catch (error) {
@@ -98,4 +98,26 @@ export const wardrobeRoute = new Hono()
         }
 
         return c.json({ item })
-    });
+    })
+    .put('/:id{[0-9]+}', getUser, zValidator("json", createItemSchema), async (c) => {
+        const id = Number.parseInt(c.req.param('id'));
+        const item = await c.req.valid("json")
+        const user = c.var.user
+
+        const validatedItem = insertItemsSchema.parse({
+            ...item,
+            userId: user.id,
+        })
+
+        const result = await db
+        .update(itemTable)
+        .set(validatedItem)
+        .where(and(eq(itemTable.userId, user.id), eq(itemTable.id, id)))
+        .returning()
+        .then(res => res[0])
+
+        if (!result) {
+            return c.notFound()
+        }
+        return c.json(result)
+    })

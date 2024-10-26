@@ -1,7 +1,7 @@
 import { hc } from 'hono/client'
 import { type ApiRoutes } from '@server/app'
 import { queryOptions } from '@tanstack/react-query'
-import { type createItem } from '@server/sharedTypes'
+import { createItem, type createItem } from '@server/sharedTypes'
 
 const client = hc<ApiRoutes>('/')
 
@@ -75,6 +75,15 @@ export async function deleteItem({ id }: { id: number }) {
     throw new Error('Network response was not ok')
   }
   return
+}
+
+export async function updateItem({ id, value }: { id: number, value: createItem}) {
+  const res = await api.wardrobe[':id{[0-9]+}'].$put({param: {id : id.toString()}, json: value})
+  if (!res.ok) {
+    throw new Error('Network response was not ok')
+  }
+  const updatedItem = await res.json()
+  return updatedItem
 }
 
 export async function getSignedURL() {
