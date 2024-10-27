@@ -15,8 +15,8 @@ import { Route as AboutImport } from './routes/about'
 import { Route as AuthenticatedImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedProfileImport } from './routes/_authenticated/profile'
-import { Route as AuthenticatedEditItemImport } from './routes/_authenticated/edit-item'
 import { Route as AuthenticatedCreateItemImport } from './routes/_authenticated/create-item'
+import { Route as AuthenticatedEditItemIdImport } from './routes/_authenticated/edit-item.$id'
 
 // Create/Update Routes
 
@@ -40,13 +40,13 @@ const AuthenticatedProfileRoute = AuthenticatedProfileImport.update({
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
-const AuthenticatedEditItemRoute = AuthenticatedEditItemImport.update({
-  path: '/edit-item',
+const AuthenticatedCreateItemRoute = AuthenticatedCreateItemImport.update({
+  path: '/create-item',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
-const AuthenticatedCreateItemRoute = AuthenticatedCreateItemImport.update({
-  path: '/create-item',
+const AuthenticatedEditItemIdRoute = AuthenticatedEditItemIdImport.update({
+  path: '/edit-item/$id',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 
@@ -75,13 +75,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreateItemImport
       parentRoute: typeof AuthenticatedImport
     }
-    '/_authenticated/edit-item': {
-      id: '/_authenticated/edit-item'
-      path: '/edit-item'
-      fullPath: '/edit-item'
-      preLoaderRoute: typeof AuthenticatedEditItemImport
-      parentRoute: typeof AuthenticatedImport
-    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -96,6 +89,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedIndexImport
       parentRoute: typeof AuthenticatedImport
     }
+    '/_authenticated/edit-item/$id': {
+      id: '/_authenticated/edit-item/$id'
+      path: '/edit-item/$id'
+      fullPath: '/edit-item/$id'
+      preLoaderRoute: typeof AuthenticatedEditItemIdImport
+      parentRoute: typeof AuthenticatedImport
+    }
   }
 }
 
@@ -103,16 +103,16 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedCreateItemRoute: typeof AuthenticatedCreateItemRoute
-  AuthenticatedEditItemRoute: typeof AuthenticatedEditItemRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
+  AuthenticatedEditItemIdRoute: typeof AuthenticatedEditItemIdRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCreateItemRoute: AuthenticatedCreateItemRoute,
-  AuthenticatedEditItemRoute: AuthenticatedEditItemRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
+  AuthenticatedEditItemIdRoute: AuthenticatedEditItemIdRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
@@ -123,17 +123,17 @@ export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/create-item': typeof AuthenticatedCreateItemRoute
-  '/edit-item': typeof AuthenticatedEditItemRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/': typeof AuthenticatedIndexRoute
+  '/edit-item/$id': typeof AuthenticatedEditItemIdRoute
 }
 
 export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/create-item': typeof AuthenticatedCreateItemRoute
-  '/edit-item': typeof AuthenticatedEditItemRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/': typeof AuthenticatedIndexRoute
+  '/edit-item/$id': typeof AuthenticatedEditItemIdRoute
 }
 
 export interface FileRoutesById {
@@ -141,24 +141,30 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/_authenticated/create-item': typeof AuthenticatedCreateItemRoute
-  '/_authenticated/edit-item': typeof AuthenticatedEditItemRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
+  '/_authenticated/edit-item/$id': typeof AuthenticatedEditItemIdRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '' | '/about' | '/create-item' | '/edit-item' | '/profile' | '/'
+  fullPaths:
+    | ''
+    | '/about'
+    | '/create-item'
+    | '/profile'
+    | '/'
+    | '/edit-item/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/about' | '/create-item' | '/edit-item' | '/profile' | '/'
+  to: '/about' | '/create-item' | '/profile' | '/' | '/edit-item/$id'
   id:
     | '__root__'
     | '/_authenticated'
     | '/about'
     | '/_authenticated/create-item'
-    | '/_authenticated/edit-item'
     | '/_authenticated/profile'
     | '/_authenticated/'
+    | '/_authenticated/edit-item/$id'
   fileRoutesById: FileRoutesById
 }
 
@@ -192,9 +198,9 @@ export const routeTree = rootRoute
       "filePath": "_authenticated.tsx",
       "children": [
         "/_authenticated/create-item",
-        "/_authenticated/edit-item",
         "/_authenticated/profile",
-        "/_authenticated/"
+        "/_authenticated/",
+        "/_authenticated/edit-item/$id"
       ]
     },
     "/about": {
@@ -204,16 +210,16 @@ export const routeTree = rootRoute
       "filePath": "_authenticated/create-item.tsx",
       "parent": "/_authenticated"
     },
-    "/_authenticated/edit-item": {
-      "filePath": "_authenticated/edit-item.tsx",
-      "parent": "/_authenticated"
-    },
     "/_authenticated/profile": {
       "filePath": "_authenticated/profile.tsx",
       "parent": "/_authenticated"
     },
     "/_authenticated/": {
       "filePath": "_authenticated/index.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/edit-item/$id": {
+      "filePath": "_authenticated/edit-item.$id.tsx",
       "parent": "/_authenticated"
     }
   }

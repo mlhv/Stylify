@@ -157,10 +157,12 @@ function ItemDeleteButton({ id, name }: { id: number; name: string | null }) {
         description: `Failed to delete item: ${name}`,
       })
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       toast('Item deleted', {
         description: `Item was successfully deleted: ${name}`,
       })
+
+      const currentTotal = await queryClient.ensureQueryData(getTotalClothesQueryOptions)
 
       queryClient.setQueryData(
         getAllItemsQueryOptions.queryKey,
@@ -169,6 +171,11 @@ function ItemDeleteButton({ id, name }: { id: number; name: string | null }) {
           items: existingItems.items.filter((item: any) => item.id !== id),
         }),
       )
+
+      queryClient.setQueryData(getTotalClothesQueryOptions.queryKey, {
+        ...currentTotal,
+        total: currentTotal.total - 1,
+      })
     },
   })
 

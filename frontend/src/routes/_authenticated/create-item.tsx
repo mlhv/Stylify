@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useState } from 'react'
 
-import { createItem, getAllItemsQueryOptions, loadingCreateItemQueryOptions, getSignedURL } from '@/lib/api'
+import { createItem, getAllItemsQueryOptions, loadingCreateItemQueryOptions, getSignedURL, getTotalClothesQueryOptions } from '@/lib/api'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { zodValidator } from '@tanstack/zod-form-adapter'
@@ -33,6 +33,7 @@ function CreateItem() {
     },
     onSubmit: async ({ value }) => {
       const existingItems = await queryClient.ensureQueryData(getAllItemsQueryOptions)
+      const currentTotal = await queryClient.ensureQueryData(getTotalClothesQueryOptions)
       
       navigate({ to: '/' })
 
@@ -68,6 +69,12 @@ function CreateItem() {
           ...existingItems,
           items: [newItem, ...existingItems.items],
         });
+
+        queryClient.setQueryData(getTotalClothesQueryOptions.queryKey, {
+          ...currentTotal,
+          total: currentTotal.total + 1,
+        });
+        
         toast('Item Created', {
           description: `Successfully created a new item: ${newItem.name}`,
           }
