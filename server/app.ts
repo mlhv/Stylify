@@ -11,6 +11,8 @@ app.use(logger())
 
 const apiRoutes = app.basePath('/api').route('/wardrobe', wardrobeRoute).route('/', authRoute).route('/signed-url', signedUrlRoute)
 
+// do bun run build to generate frontend/dist
+
 app.get('*', serveStatic({ root: './frontend/dist' }))
 app.get('*', serveStatic({ path: './frontend/dist/index.html' }))
 
