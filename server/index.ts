@@ -1,4 +1,7 @@
 import app from './app';
+import { config } from 'dotenv';
+
+config();
 
 const server = Bun.serve({
     fetch: app.fetch,

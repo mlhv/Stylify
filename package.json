@@ -19,6 +19,7 @@
     "@aws-sdk/s3-request-presigner": "^3.670.0",
     "@hono/zod-validator": "^0.2.2",
     "@kinde-oss/kinde-typescript-sdk": "^2.9.1",
+    "dotenv": "^17.2.3",
     "drizzle-orm": "^0.33.0",
     "drizzle-zod": "^0.5.1",
     "fashionapp": "file:",
