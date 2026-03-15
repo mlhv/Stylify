@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getUser } from "../kinde";
 
 const s3 = new S3Client({
     region: process.env.AWS_BUCKET_REGION,
@@ -13,7 +14,7 @@ const s3 = new S3Client({
 const maxFileSize = 1024 * 1024 * 10; // 10 MB
 
 export const signedUrlRoute = new Hono()
-    .get('/', async (c) => {
+    .get('/', getUser, async (c) => {
         try {
             const putObjectCommand = new PutObjectCommand({
                 Bucket: process.env.AWS_BUCKET_NAME!,
