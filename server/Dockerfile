@@ -6,9 +6,9 @@ COPY --from=aws-lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
 ENV PORT=8080
 WORKDIR /var/task
 
-COPY package.json bun.lock ./
+COPY package.json bun.lockb ./
 RUN bun install --production --frozen-lockfile
 
-COPY . /var/task
+COPY server/ ./server/
 
-CMD ["bun", "index.ts"]
+CMD ["bun", "server/index.ts"]

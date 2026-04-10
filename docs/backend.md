@@ -12,14 +12,18 @@ The backend is built with **[Hono](https://hono.dev)** running on **[Bun](https:
 **App setup** (`server/app.ts`):
 ```ts
 const app = new Hono()
-app.use('*', logger())           // log all requests
-app.route('/api', authRoutes)    // /api/login, /logout, /me, etc.
-app.route('/api', wardrobeRoutes)
-app.route('/api', signedUrlRoutes)
-app.get('*', serveStatic(...))   // serves the React frontend build
+app.use(logger())
+
+const apiRoutes = app.basePath('/api')
+  .route('/wardrobe', wardrobeRoute)
+  .route('/', authRoute)
+  .route('/signed-url', signedUrlRoute)
+
+export default app
+export type ApiRoutes = typeof apiRoutes  // used by the Hono RPC client on the frontend
 ```
 
-The backend serves the **compiled frontend static files** as well, so there's only one server process in production. The Vite dev server is only used during frontend development.
+The backend handles **API routes only** (`/api/*`). It does not serve the frontend. In development, Vite's dev server serves the frontend and proxies `/api` requests to the Hono backend. In production, the frontend must be served separately (e.g. S3 + CloudFront).
 
 ---
 
