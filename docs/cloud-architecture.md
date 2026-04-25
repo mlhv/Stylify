@@ -434,18 +434,32 @@ It all looks like one seamless domain.
 - [ ] Update Kinde dashboard: callback URL and logout URL to `https://yourdomain.com`
 
 ### Every Deploy
-```bash
-# Backend — rebuild and push new image
-docker build -t stylify-backend -f server/Dockerfile .
-docker tag stylify-backend:latest <account-id>.dkr.ecr.us-east-2.amazonaws.com/stylify-backend:latest
-docker push <account-id>.dkr.ecr.us-east-2.amazonaws.com/stylify-backend:latest
-# Then update Lambda to use the new image (AWS Console or CLI)
 
-# Frontend — rebuild and sync to S3
+#### Backend (any change to `server/`)
+```bash
+# 1. Re-authenticate to ECR (token expires every 12 hours)
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 779846779460.dkr.ecr.us-east-1.amazonaws.com
+
+# 2. Rebuild image (--platform and --provenance flags required for Apple Silicon)
+docker build --platform linux/amd64 --provenance=false -t stylify-backend -f server/Dockerfile .
+
+# 3. Tag and push to ECR
+docker tag stylify-backend:latest 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest
+docker push 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest
+
+# 4. Update Lambda to use the new image
+aws lambda update-function-code \
+  --function-name <your-function-name> \
+  --image-uri 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest \
+  --region us-east-1
+```
+
+#### Frontend (any change to `frontend/src/`)
+```bash
 cd frontend && bun run build
-aws s3 sync dist/ s3://stylify-frontend-yourname/ --delete
-# Optionally invalidate CloudFront cache so changes are live immediately:
-aws cloudfront create-invalidation --distribution-id <dist-id> --paths "/*"
+aws s3 sync dist/ s3://stylify-frontend/ --delete --region us-east-1
+# Invalidate CloudFront cache so changes are live immediately
+aws cloudfront create-invalidation --distribution-id EIH8J5L7N96GZ --paths "/*" --region us-east-1
 ```
 
 ### Smoke Tests After Deploy
