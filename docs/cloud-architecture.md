@@ -178,6 +178,19 @@ After that, Lambda stays warm for ~15 minutes and subsequent requests are instan
 For a personal wardrobe app this is usually acceptable. You can optionally keep it warm
 with a scheduled EventBridge ping every 5 minutes (within free tier, costs nothing).
 
+#### Keeping Lambda Warm with EventBridge (Optional)
+
+Create a scheduled rule in EventBridge that pings `/api/me` every 5 minutes:
+
+1. Go to **EventBridge → Rules → Create rule**
+2. Rule type: **Schedule**
+3. Schedule pattern: `rate(5 minutes)`
+4. Target: **API Gateway** → your HTTP API → path `/api/me` → method `GET`
+
+This keeps the container warm so cold starts never happen in practice. The ping
+hits `/api/me` which returns 401 (unauthenticated) — that's fine, the goal is just
+to trigger Lambda, not to get a valid response. Stays within the free tier.
+
 ### The Lambda Adapter — No Code Changes Required
 
 Lambda normally expects a specific function signature, not a web server. Your Hono app is
@@ -252,6 +265,79 @@ This project uses **HTTP API (v2)** — the simpler, cheaper version of API Gate
 ($1/million requests vs $3.50/million for REST API). It uses a single `$default` route
 that forwards all paths and methods to Lambda. Hono's own router then decides which
 handler runs based on the path.
+
+---
+
+### The Host Header Bug (and Why It Took So Long to Find)
+
+During the initial setup, every request to `stylify.space/api/*` was returning
+`index.html` instead of hitting Lambda. CloudFront logs showed `x-cache: Error from
+cloudfront` and `server: AmazonS3` — meaning S3 was responding, not API Gateway.
+The CloudFront behavior looked correct in the console, the distribution was deployed,
+and the API Gateway URL was right. Lambda had zero log entries.
+
+**The root cause:**
+
+CloudFront's `Managed-AllViewer` origin request policy forwards **all** viewer request
+headers to the origin — including the `Host` header. When a browser visits
+`stylify.space/api/login`, the request arrives at CloudFront with `Host: stylify.space`.
+CloudFront then forwards that exact Host header to API Gateway.
+
+API Gateway only accepts requests where the Host header matches its own domain
+(`qc21edd692.execute-api.us-east-1.amazonaws.com`). When it receives
+`Host: stylify.space`, it returns a **403 Forbidden** — before Lambda is ever invoked.
+
+CloudFront then hits the custom error page rule (403 → serve `index.html` with 200),
+so the browser receives `index.html` from S3 instead of the API response. This made it
+look like the behavior wasn't routing to API Gateway at all, when in reality it was —
+and API Gateway was immediately rejecting every request.
+
+```
+Browser → stylify.space/api/login
+              │
+              ↓
+        CloudFront (behavior: /api/* → API Gateway)
+              │
+              │  Host: stylify.space  ← forwarded from viewer by AllViewer policy
+              ↓
+        API Gateway → 403 Forbidden  ← doesn't recognize stylify.space as its domain
+              │
+              ↓
+        CloudFront custom error rule: 403 → serve index.html with 200
+              │
+              ↓
+        Browser receives index.html  ← looks like S3, not API Gateway
+```
+
+**Why it was hard to debug:**
+
+- Lambda had no logs (correct — API Gateway rejected before invoking Lambda)
+- The response showed `server: AmazonS3` (the custom error page came from S3)
+- `x-cache: Error from cloudfront` looked like a caching issue, not an auth issue
+- The CloudFront behavior and origin config were both correct — the problem was
+  a single policy setting, invisible unless you tested API Gateway directly with
+  the wrong Host header
+
+**The fix:**
+
+Change the CloudFront `/api/*` behavior's Origin request policy from
+`Managed-AllViewer` to **`Managed-AllViewerExceptHostHeader`**.
+
+This forwards everything (cookies, headers, query strings) to API Gateway — but
+strips the Host header, letting CloudFront substitute the origin domain instead.
+API Gateway sees `Host: qc21edd692.execute-api.us-east-1.amazonaws.com` and
+accepts the request. Kinde auth cookies are still forwarded, so authentication
+works correctly.
+
+**Confirmed with:**
+```bash
+# This returns 403 — API Gateway rejects the wrong Host header
+curl -H "Host: da7wcxqusialv.cloudfront.net" \
+  https://qc21edd692.execute-api.us-east-1.amazonaws.com/api/login
+
+# This returns 302 → Kinde — correct behavior through CloudFront
+curl https://stylify.space/api/login
+```
 
 ---
 
