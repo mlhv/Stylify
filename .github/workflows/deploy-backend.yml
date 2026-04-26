@@ -1,0 +1,42 @@
+name: Deploy Backend
+
+on:
+  workflow_dispatch:
+  # Uncomment the following lines to enable automatic deployment on push to main branch
+  # push:
+  #   branches: [main]
+  #   paths:
+  #     - 'server/**'
+  #     - 'package.json'
+  #     - 'bun.lockb'
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        run: |
+          docker build --platform linux/amd64 --provenance=false \
+            -t 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest \
+            -f server/Dockerfile .
+          docker push 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest
+
+      - name: Update Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name stylifyServer \
+            --image-uri 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest \
+            --region us-east-1
