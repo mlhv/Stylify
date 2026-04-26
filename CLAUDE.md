@@ -69,16 +69,19 @@ frontend/src/
 - **Cache updates:** Mutations manually call `queryClient.setQueryData()` instead of refetching. No optimistic rollback — updates are confirmed before cache is touched.
 - **Single DB table:** Only one table (`items`) with columns: id, user_id, name, size, type, color, created_at, image_url.
 
-## Current Deployment (EC2 — being migrated)
-- Runs on EC2 t3.micro + PM2, port 8080
-- Domain via Porkbun DNS
-- Costs ~$12/month (EC2 + public IPv4)
+## Current Deployment (Serverless — live at stylify.space)
+- **Frontend:** S3 bucket `stylify-frontend` (us-east-1) + CloudFront distribution `EIH8J5L7N96GZ`
+- **Backend:** Lambda (us-east-1) + API Gateway HTTP API `qc21edd692` → container from ECR `wardrobe-app`
+- **Images:** S3 bucket `stylify-local-minh` (us-east-2), presigned URL upload, CORS allows `stylify.space`
+- **Routing:** CloudFront `/api/*` → API Gateway, `/*` → S3. Origin request policy must be `AllViewerExceptHostHeader` on the `/api/*` behavior — `AllViewer` causes API Gateway to return 403 (Host header mismatch)
+- **DNS:** Porkbun ALIAS `stylify.space` → CloudFront, ACM cert in us-east-1
+- **Costs:** ~$0.15/month (down from ~$12/month on EC2)
+- **EC2:** Terminated. Migration complete.
 
-## Planned: Serverless Migration (not yet done)
-Migrating to Lambda + API Gateway + S3 + CloudFront to reduce bill to ~$0.15/month.
-- `server/Dockerfile` is already set up with AWS Lambda Adapter (no Hono code changes needed)
-- `.dockerignore` at repo root is set up for building from repo root
-- See `docs/cloud-architecture.md` for the full plan and deployment checklist
+## Deploying Changes
+See `docs/cloud-architecture.md` for full commands. Summary:
+- **Backend change:** rebuild Docker image with `--platform linux/amd64 --provenance=false`, push to ECR, update Lambda
+- **Frontend change:** `bun run build` in `frontend/`, sync to S3, invalidate CloudFront cache
 
 ## Documentation
 All architecture docs are in `docs/`:
