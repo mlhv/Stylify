@@ -519,32 +519,41 @@ It all looks like one seamless domain.
 - [ ] Add CNAME records in Porkbun DNS (domain → CloudFront, ACM validation)
 - [ ] Update Kinde dashboard: callback URL and logout URL to `https://yourdomain.com`
 
-### Every Deploy
+### Every Deploy (Automated via GitHub Actions)
 
-#### Backend (any change to `server/`)
+Deployments are handled automatically by two workflows in `.github/workflows/`:
+
+| Workflow | File | Trigger |
+|---|---|---|
+| Deploy Backend | `deploy-backend.yml` | Push to `main` touching `server/`, `package.json`, or `bun.lockb` |
+| Deploy Frontend | `deploy-frontend.yml` | Push to `main` touching `frontend/` |
+
+Both can also be triggered manually from the **Actions** tab in GitHub (useful if you want to force a redeploy without a code change).
+
+#### Manual Deploy (fallback if CI is broken)
+
+**Backend:**
 ```bash
 # 1. Re-authenticate to ECR (token expires every 12 hours)
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 779846779460.dkr.ecr.us-east-1.amazonaws.com
 
-# 2. Rebuild image (--platform and --provenance flags required for Apple Silicon)
-docker build --platform linux/amd64 --provenance=false -t stylify-backend -f server/Dockerfile .
-
-# 3. Tag and push to ECR
-docker tag stylify-backend:latest 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest
+# 2. Rebuild image (--platform and --provenance flags required on Apple Silicon)
+docker build --platform linux/amd64 --provenance=false \
+  -t 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest \
+  -f server/Dockerfile .
 docker push 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest
 
-# 4. Update Lambda to use the new image
+# 3. Update Lambda
 aws lambda update-function-code \
-  --function-name <your-function-name> \
+  --function-name stylifyServer \
   --image-uri 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest \
   --region us-east-1
 ```
 
-#### Frontend (any change to `frontend/src/`)
+**Frontend:**
 ```bash
 cd frontend && bun run build
 aws s3 sync dist/ s3://stylify-frontend/ --delete --region us-east-1
-# Invalidate CloudFront cache so changes are live immediately
 aws cloudfront create-invalidation --distribution-id EIH8J5L7N96GZ --paths "/*" --region us-east-1
 ```
 
@@ -559,15 +568,3 @@ open https://yourdomain.com
 
 Then manually: login → create item → edit item → delete item → logout.
 
----
-
-## Teardown (Terminating EC2)
-
-Once the serverless stack is verified working:
-
-1. Stop the EC2 instance
-2. Create a final AMI snapshot (optional, for rollback)
-3. Terminate the EC2 instance
-4. Release the Elastic IP / public IPv4 allocation
-
-These two steps eliminate both line items from your AWS bill.

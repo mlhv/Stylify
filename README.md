@@ -59,7 +59,7 @@ Stylify/
 
 ### Prerequisites
 - [Bun](https://bun.sh) installed
-- `.env` file with `DATABASE_URL`, AWS credentials, and Kinde credentials
+- `.env` file with `DATABASE_URL`, `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`, and Kinde credentials
 
 ### Development
 
@@ -70,12 +70,23 @@ bun install
 # Install frontend dependencies
 cd frontend && bun install && cd ..
 
-# Build the frontend (backend serves the static build)
-cd frontend && bun run build && cd ..
-
-# Start the backend server (serves API + static frontend on :8080)
+# Start the backend (port 8080)
 bun run dev
+
+# Start the frontend dev server (port 5173) — proxies /api/* to :8080
+cd frontend && bun run dev
 ```
+
+## Deployment
+
+Deployments are automated via GitHub Actions (`.github/workflows/`):
+
+| Workflow | Trigger | What it does |
+|---|---|---|
+| Deploy Backend | Push to `main` touching `server/` | Builds Docker image → pushes to ECR → updates Lambda |
+| Deploy Frontend | Push to `main` touching `frontend/` | Vite build → S3 sync → CloudFront invalidation |
+
+Both workflows can also be triggered manually from the **Actions** tab in GitHub. See [`docs/cloud-architecture.md`](docs/cloud-architecture.md) for infrastructure details and manual deploy commands.
 
 ## Documentation
 
@@ -88,3 +99,4 @@ bun run dev
 | Zod schemas | [docs/zod.md](docs/zod.md) |
 | Hono RPC vs REST | [docs/hono-rpc.md](docs/hono-rpc.md) |
 | Full data flow | [docs/data-flow.md](docs/data-flow.md) |
+| Cloud architecture & deployment | [docs/cloud-architecture.md](docs/cloud-architecture.md) |

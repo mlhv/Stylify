@@ -79,9 +79,11 @@ frontend/src/
 - **EC2:** Terminated. Migration complete.
 
 ## Deploying Changes
-See `docs/cloud-architecture.md` for full commands. Summary:
-- **Backend change:** rebuild Docker image with `--platform linux/amd64 --provenance=false`, push to ECR, update Lambda
-- **Frontend change:** `bun run build` in `frontend/`, sync to S3, invalidate CloudFront cache
+CI/CD is handled by GitHub Actions (`.github/workflows/`):
+- **Backend:** push to `main` with changes in `server/` auto-triggers the backend workflow (build Docker image → push to ECR → update Lambda). Can also trigger manually in the Actions tab.
+- **Frontend:** push to `main` with changes in `frontend/` auto-triggers the frontend workflow (Vite build → S3 sync → CloudFront invalidation).
+
+See `docs/cloud-architecture.md` for the manual deploy commands (useful if CI is broken).
 
 ## Documentation
 All architecture docs are in `docs/`:
