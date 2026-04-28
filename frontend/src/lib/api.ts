@@ -122,3 +122,19 @@ export const getItemQueryOptions = (id: number) => queryOptions({
     queryFn: () => getItem({ id }),
     staleTime: 1000 * 60 * 5,
 })
+
+export async function markAsWorn({ id }: { id: number }) {
+  const res = await fetch (`/api/wardrobe/${id}/worn`, { method: 'POST' , credentials: 'include' })
+  if (!res.ok) {
+    throw new Error('Failed to mark item as worn')
+  }
+  return res.json() as Promise<{ item: typeof getAllItems extends () => Promise<{ items: infer I[] }> ? I : never }>
+}
+
+export async function getRecommendations({ lat, lon }: { lat: number; lon: number }) {
+  const res = await api.recommendations.$get({ query: { lat: lat.toString(), lon: lon.toString() } })
+  if (!res.ok) {
+    throw new Error('Failed to get recommendations')
+  }
+  return res.json() as Promise<{ suggestions: OutfitSuggestion[] }>
+}

@@ -45,6 +45,21 @@ export const wardrobeRoute = new Hono()
         c.status(201)
         return c.json(result);
     })
+    .post('/:id{[0-9]+}/worn', getUser, async (c) => {
+        const id = Number.parseInt(c.req.param('id'));
+        const user = c.var.user
+        const result = await db
+        .update(itemTable)
+        .set({ lastWornAt: new Date() })
+        .where(and(eq(itemTable.userId, user.id), eq(itemTable.id, id)))
+        .returning()
+        .then(res => res[0])
+        
+        if (!result) {
+            return c.notFound()
+        }
+        return c.json({ item: result })
+    })
     .get('/total-items', getUser, async (c) => {
         const user = c.var.user
         const result = await db

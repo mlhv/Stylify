@@ -16,6 +16,7 @@ export const items = pgTable('items',
   type: varchar('type', { length: 256 }),
   color: varchar('color', { length: 256 }),
   createdAt: timestamp('created_at').defaultNow(),
+  lastWornAt: timestamp('last_worn_at'),
   imageUrl: text('image_url').notNull(),
 },
  (items) => {

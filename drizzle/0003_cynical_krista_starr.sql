@@ -1,0 +1,1 @@
+ALTER TABLE "items" ADD COLUMN "last_worn_at" timestamp;
