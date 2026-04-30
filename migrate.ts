@@ -5,4 +5,5 @@ import postgres from 'postgres';
 // for migrations
 const migrationClient = postgres(process.env.DATABASE_URL!, { max: 1 });
 await migrate(drizzle(migrationClient), { migrationsFolder: "./drizzle" })
+await migrationClient.end()
 console.log("Migrations ran successfully")
