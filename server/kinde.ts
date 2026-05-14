@@ -22,7 +22,7 @@ export const sessionManager = (c: Context): SessionManager => ({
   async setSessionItem(key: string, value: unknown) {
     const cookieOptions = {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: "lax",
         } as const;
         if (typeof value === "string") {

@@ -15,6 +15,7 @@ import { Route as AboutImport } from './routes/about'
 import { Route as AuthenticatedImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedProfileImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedOutfitSuggestionsImport } from './routes/_authenticated/outfit-suggestions'
 import { Route as AuthenticatedCreateItemImport } from './routes/_authenticated/create-item'
 import { Route as AuthenticatedEditItemIdImport } from './routes/_authenticated/edit-item.$id'
 
@@ -39,6 +40,12 @@ const AuthenticatedProfileRoute = AuthenticatedProfileImport.update({
   path: '/profile',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+
+const AuthenticatedOutfitSuggestionsRoute =
+  AuthenticatedOutfitSuggestionsImport.update({
+    path: '/outfit-suggestions',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 
 const AuthenticatedCreateItemRoute = AuthenticatedCreateItemImport.update({
   path: '/create-item',
@@ -75,6 +82,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCreateItemImport
       parentRoute: typeof AuthenticatedImport
     }
+    '/_authenticated/outfit-suggestions': {
+      id: '/_authenticated/outfit-suggestions'
+      path: '/outfit-suggestions'
+      fullPath: '/outfit-suggestions'
+      preLoaderRoute: typeof AuthenticatedOutfitSuggestionsImport
+      parentRoute: typeof AuthenticatedImport
+    }
     '/_authenticated/profile': {
       id: '/_authenticated/profile'
       path: '/profile'
@@ -103,6 +117,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedCreateItemRoute: typeof AuthenticatedCreateItemRoute
+  AuthenticatedOutfitSuggestionsRoute: typeof AuthenticatedOutfitSuggestionsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedEditItemIdRoute: typeof AuthenticatedEditItemIdRoute
@@ -110,6 +125,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCreateItemRoute: AuthenticatedCreateItemRoute,
+  AuthenticatedOutfitSuggestionsRoute: AuthenticatedOutfitSuggestionsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedEditItemIdRoute: AuthenticatedEditItemIdRoute,
@@ -123,6 +139,7 @@ export interface FileRoutesByFullPath {
   '': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/create-item': typeof AuthenticatedCreateItemRoute
+  '/outfit-suggestions': typeof AuthenticatedOutfitSuggestionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/': typeof AuthenticatedIndexRoute
   '/edit-item/$id': typeof AuthenticatedEditItemIdRoute
@@ -131,6 +148,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/create-item': typeof AuthenticatedCreateItemRoute
+  '/outfit-suggestions': typeof AuthenticatedOutfitSuggestionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/': typeof AuthenticatedIndexRoute
   '/edit-item/$id': typeof AuthenticatedEditItemIdRoute
@@ -141,6 +159,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/about': typeof AboutRoute
   '/_authenticated/create-item': typeof AuthenticatedCreateItemRoute
+  '/_authenticated/outfit-suggestions': typeof AuthenticatedOutfitSuggestionsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/edit-item/$id': typeof AuthenticatedEditItemIdRoute
@@ -152,16 +171,24 @@ export interface FileRouteTypes {
     | ''
     | '/about'
     | '/create-item'
+    | '/outfit-suggestions'
     | '/profile'
     | '/'
     | '/edit-item/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/about' | '/create-item' | '/profile' | '/' | '/edit-item/$id'
+  to:
+    | '/about'
+    | '/create-item'
+    | '/outfit-suggestions'
+    | '/profile'
+    | '/'
+    | '/edit-item/$id'
   id:
     | '__root__'
     | '/_authenticated'
     | '/about'
     | '/_authenticated/create-item'
+    | '/_authenticated/outfit-suggestions'
     | '/_authenticated/profile'
     | '/_authenticated/'
     | '/_authenticated/edit-item/$id'
@@ -198,6 +225,7 @@ export const routeTree = rootRoute
       "filePath": "_authenticated.tsx",
       "children": [
         "/_authenticated/create-item",
+        "/_authenticated/outfit-suggestions",
         "/_authenticated/profile",
         "/_authenticated/",
         "/_authenticated/edit-item/$id"
@@ -208,6 +236,10 @@ export const routeTree = rootRoute
     },
     "/_authenticated/create-item": {
       "filePath": "_authenticated/create-item.tsx",
+      "parent": "/_authenticated"
+    },
+    "/_authenticated/outfit-suggestions": {
+      "filePath": "_authenticated/outfit-suggestions.tsx",
       "parent": "/_authenticated"
     },
     "/_authenticated/profile": {
