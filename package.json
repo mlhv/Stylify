@@ -4,28 +4,8 @@
   "type": "module",
   "scripts": {
     "start": "bun server/index.ts",
-    "dev": "bun --watch server/index.ts"
-  },
-  "devDependencies": {
-    "@flydotio/dockerfile": "^0.5.8",
-    "@types/bun": "latest",
-    "drizzle-kit": "^0.24.2"
-  },
-  "peerDependencies": {
-    "typescript": "^5.0.0"
-  },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.670.0",
-    "@aws-sdk/s3-request-presigner": "^3.670.0",
-    "@google/genai": "^2.3.0",
-    "@hono/zod-validator": "^0.2.2",
-    "@kinde-oss/kinde-typescript-sdk": "^2.9.1",
-    "dotenv": "^17.2.3",
-    "drizzle-orm": "^0.33.0",
-    "drizzle-zod": "^0.5.1",
-    "fashionapp": "file:",
-    "hono": "^4.6.9",
-    "postgres": "^3.4.4",
-    "zod": "^3.23.8"
+    "dev": "bun --watch server/index.ts",
+    "dev:frontend": "cd frontend && bun run dev",
+    "dev:all": "bun run dev & bun run dev:frontend"
   }
 }
