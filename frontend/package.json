@@ -21,7 +21,6 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.10",
-    "frontend": "file:",
     "hono": "^4.6.9",
     "lucide-react": "^0.439.0",
     "next-themes": "^0.3.0",
@@ -30,7 +29,7 @@
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.5.2",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "^4.4.3"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",

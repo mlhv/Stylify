@@ -2,13 +2,11 @@
   "name": "fashionapp",
   "module": "server/index.ts",
   "type": "module",
+  "workspaces": ["frontend", "server"],
   "scripts": {
     "start": "bun server/index.ts",
     "dev": "bun --watch server/index.ts",
     "dev:frontend": "cd frontend && bun run dev",
     "dev:all": "bun run dev & bun run dev:frontend"
-  },
-  "dependencies": {
-    "zod": "^4.4.3"
   }
 }
