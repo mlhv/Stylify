@@ -3,6 +3,10 @@
   "module": "server/index.ts",
   "type": "module",
   "workspaces": ["frontend", "server", "shared"],
+  "overrides": {
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  },
   "scripts": {
     "start": "bun server/index.ts",
     "dev": "bun --watch server/index.ts",
