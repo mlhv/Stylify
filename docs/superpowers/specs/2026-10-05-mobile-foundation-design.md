@@ -225,4 +225,7 @@ Still open, for plan 2:
 - How `@kinde/expo` requests an audience (its README does not document it). Fallback: `expo-auth-session` directly, which Kinde's SDK is built on.
 - Whether `react-native-executorch` supports Expo SDK 57; if not, the app starts on the newest SDK it does support.
 - NativeWind's version for the chosen SDK.
+- Whether an unreachable Kinde key set should return 503 instead of 401. Today every bearer failure is 401, and the mobile rule is "401: refresh once, else sign out", so a Kinde outage would sign mobile users out. Decide before the app depends on it.
+- Install with `--filter` in both deploy workflows once `mobile` joins the workspace, so web deploys do not install React Native; add `mobile` build directories to `.dockerignore`.
+- Before plan 2: repair the frontend typecheck (`frontend/src/lib/api.ts:132` plus the 15 type errors behind it) and add it to the frontend workflow, since `mobile/` will share the `ApiRoutes` type and copy `api.ts` patterns.
 - Xcode is not installed on Minh's Mac (command-line tools only), so device builds go through EAS Build in the cloud unless Xcode is installed.
