@@ -1,7 +1,9 @@
-import {createKindeServerClient, GrantType, type SessionManager, type UserType} from "@kinde-oss/kinde-typescript-sdk";
+import {createKindeServerClient, GrantType, type SessionManager} from "@kinde-oss/kinde-typescript-sdk";
 import { type Context } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
-import { createFactory, createMiddleware } from 'hono/factory'
+import { createRemoteJWKSet } from "jose";
+import { createBearerVerifier } from "./auth/bearer";
+import { createGetUser, type AuthUser } from "./auth/getUser";
 
 // Client for authorization code flow
 export const kindeClient = createKindeServerClient(GrantType.AUTHORIZATION_CODE, {
@@ -42,26 +44,25 @@ export const sessionManager = (c: Context): SessionManager => ({
   }
 });
 
-type Env = {
-  Variables: {
-    user: UserType
+// The key set is fetched on first use and cached. Built only when the domain is
+// set, so a missing variable disables bearer auth instead of crashing at import.
+const kindeDomain = (process.env.KINDE_DOMAIN ?? '').replace(/\/+$/, '');
+
+const verifyBearer = createBearerVerifier({
+  issuer: process.env.KINDE_DOMAIN,
+  audience: process.env.KINDE_AUDIENCE,
+  jwks: kindeDomain ? createRemoteJWKSet(new URL(`${kindeDomain}/.well-known/jwks`)) : undefined,
+});
+
+async function cookieAuth(c: Context): Promise<AuthUser | null> {
+  const manager = sessionManager(c);
+  const isAuthenticated = await kindeClient.isAuthenticated(manager);
+  if (!isAuthenticated) {
+    return null;
   }
+  return kindeClient.getUserProfile(manager);
 }
 
-export const getUser = createMiddleware<Env>(async (c, next) => {
-  const manager = sessionManager(c);
-  try {
-        const isAuthenicated = await kindeClient.isAuthenticated(manager);
-
-        if (!isAuthenicated) {
-            return c.json({ error: 'Not authenticated' }, 401);
-        }
-
-        const user = await kindeClient.getUserProfile(manager);
-        c.set('user', user)
-        await next()
-    } catch (error) {
-      console.error(error)
-      return c.json({ error: 'Not authenticated' }, 401);
-  }
-})
+// Mobile sends a Kinde access token as a bearer token; the web app uses the
+// httpOnly cookies set by /api/callback.
+export const getUser = createGetUser({ verifyBearer, cookieAuth });

@@ -127,9 +127,10 @@ function ErrorState() {
   )
 }
 
-function getInitials(firstName: string, lastName: string) {
-  const full_name = firstName + ' ' + lastName
-  return full_name
+function getInitials(firstName?: string, lastName?: string) {
+  return [firstName, lastName]
+    .filter(Boolean)
+    .join(' ')
     .split(' ')
     .map(part => part[0])
     .join('')
