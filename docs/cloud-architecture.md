@@ -232,9 +232,9 @@ Your entire Hono codebase — routes, middleware, auth — runs completely uncha
 - `KINDE_DOMAIN`, `KINDE_CLIENT_ID`, `KINDE_CLIENT_SECRET`
 - `KINDE_REDIRECT_URI`, `KINDE_LOGOUT_REDIRECT_URI`
 - `KINDE_AUDIENCE` (the API audience registered in Kinde; bearer tokens are rejected without it)
-- `FRONTEND_URL`
 - `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`
-- `GEMINI_API_KEY`
+
+Not set on Lambda as of 2026-10-05: `GEMINI_API_KEY` (outfit recommendations return an empty list on the live site until it is added) and `FRONTEND_URL` (local development only; in production the login callback falls back to `/`).
 
 S3 access comes from the Lambda execution role, not from access keys.
 

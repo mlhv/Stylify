@@ -185,7 +185,7 @@ When an item is deleted, the backend extracts the S3 key from the stored URL and
 | `KINDE_AUDIENCE` | API audience registered in Kinde; required for bearer tokens |
 | `AWS_BUCKET_NAME` | Image bucket name |
 | `AWS_BUCKET_REGION` | Image bucket region |
-| `FRONTEND_URL` | Where `/api/callback` redirects after login |
-| `GEMINI_API_KEY` | Gemini API key for outfit recommendations |
+| `FRONTEND_URL` | Where `/api/callback` redirects after login. Local only; not set on Lambda, where the callback falls back to `/` |
+| `GEMINI_API_KEY` | Gemini API key for outfit recommendations. Not yet set on Lambda, so recommendations return an empty list on the live site |
 
 S3 access comes from the Lambda execution role, not from access keys.

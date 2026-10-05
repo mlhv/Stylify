@@ -67,7 +67,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - Backend: Lambda `stylifyServer` (us-east-1) from ECR `wardrobe-app`, behind API Gateway HTTP API `qc21edd692`.
 - Images: S3 bucket `stylify-local-minh` (us-east-2).
 - CloudFront sends `/api/*` to API Gateway and everything else to S3. The `/api/*` behaviour must use the `AllViewerExceptHostHeader` origin request policy; `AllViewer` makes API Gateway return 403.
-- Lambda environment variables: `DATABASE_URL`, `KINDE_DOMAIN`, `KINDE_CLIENT_ID`, `KINDE_CLIENT_SECRET`, `KINDE_REDIRECT_URI`, `KINDE_LOGOUT_REDIRECT_URI`, `KINDE_AUDIENCE` (required for bearer auth; may not be set yet, and bearer requests are rejected until it is), `FRONTEND_URL`, `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`, `GEMINI_API_KEY`.
+- Lambda environment variables, as set on 2026-10-05: `DATABASE_URL`, `KINDE_DOMAIN`, `KINDE_ISSUER_URL`, `KINDE_CLIENT_ID`, `KINDE_CLIENT_SECRET`, `KINDE_REDIRECT_URI`, `KINDE_LOGOUT_REDIRECT_URI`, `KINDE_AUDIENCE` (`https://stylify.space/api`, required for bearer auth), `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`. **Not set on Lambda:** `GEMINI_API_KEY` (so `/api/recommendations` returns an empty list on the live site until it is added) and `FRONTEND_URL` (the login callback falls back to `/`, which is correct in production). Both are in the local `.env`.
 
 Smoke test after any deploy:
 
