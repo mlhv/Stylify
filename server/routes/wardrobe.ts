@@ -6,7 +6,7 @@ import { db } from '../db'
 import { items as itemTable, insertItemsSchema } from '../db/schema/items'
 import { eq, desc, and, count } from 'drizzle-orm'
 
-import { createItemSchema } from '../sharedTypes'
+import { createItemSchema } from '@stylify/shared'
 
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
 

@@ -1,8 +1,8 @@
 import { hc } from 'hono/client'
 import { type ApiRoutes } from '@server/app'
 import { queryOptions } from '@tanstack/react-query'
-import { type createItem } from '@server/sharedTypes'
-import { type OutfitSuggestion } from '@server/sharedTypes'
+import { type createItem } from '@stylify/shared'
+import { type OutfitSuggestion } from '@stylify/shared'
 
 const client = hc<ApiRoutes>('/')
 

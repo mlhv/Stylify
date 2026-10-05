@@ -2,7 +2,7 @@
   "name": "fashionapp",
   "module": "server/index.ts",
   "type": "module",
-  "workspaces": ["frontend", "server"],
+  "workspaces": ["frontend", "server", "shared"],
   "scripts": {
     "start": "bun server/index.ts",
     "dev": "bun --watch server/index.ts",

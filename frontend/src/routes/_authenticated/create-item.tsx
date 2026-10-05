@@ -11,7 +11,7 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { zodValidator } from '@tanstack/zod-form-adapter'
 
-import { createItemSchema } from '@server/sharedTypes'
+import { createItemSchema } from '@stylify/shared'
 
 export const Route = createFileRoute('/_authenticated/create-item')({
   component: CreateItem,

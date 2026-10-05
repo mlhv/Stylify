@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - 'server/**'
+      - 'shared/**'
+      - 'package.json'
+      - '.github/workflows/deploy-backend.yml'
 
 jobs:
   deploy:

@@ -6,7 +6,7 @@ import { GoogleGenAI } from '@google/genai'
 import { db } from '../db'
 import { items as itemTable } from '../db/schema/items'
 import { eq } from 'drizzle-orm'
-import { type OutfitSuggestion } from '../sharedTypes'
+import { type OutfitSuggestion } from '@stylify/shared'
 
 const ai = new GoogleGenAI({})
 

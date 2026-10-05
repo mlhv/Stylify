@@ -1,7 +1,7 @@
 import { text, pgTable, serial, index, varchar, timestamp } from 'drizzle-orm/pg-core';
-
-import { createInsertSchema, createSelectSchema } from 'drizzle-zod';
 import { z } from 'zod';
+
+import { createItemSchema } from '@stylify/shared';
 
 // Any time schema is changed, run bun drizzle-kit generate to generate the new migrations
 // Then run bun migrate.ts to apply the migrations
@@ -25,14 +25,7 @@ export const items = pgTable('items',
   }
 });
 
-// Schema for inserting an item - can be used to validate API requests
-export const insertItemsSchema = createInsertSchema(items, {
-  id: z.number().int().positive().min(1),
-  name: z.string().min(1, 'Name must be at least 1 character long'),
-  type: z.string().min(1, 'Type must be at least 1 character long'),
-  size: z.string().min(1, 'Size must be at least 1 character long'),
-  color: z.string().min(1, 'Color must be at least 1 character long'),
-  imageUrl: z.string().url('Image URL must be a valid URL'),
+// Server-side insert schema = client contract + userId injected by the route.
+export const insertItemsSchema = createItemSchema.extend({
+  userId: z.string().min(1),
 });
-// Schema for selecting an item - can be used to validate API responses
-export const selectItemsSchema = createSelectSchema(items);
