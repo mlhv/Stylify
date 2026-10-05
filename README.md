@@ -25,7 +25,6 @@ Stylify/
 │   ├── app.ts               # App entry, route registration
 │   ├── index.ts             # Bun server bootstrap
 │   ├── kinde.ts             # Kinde auth client + getUser middleware
-│   ├── sharedTypes.ts       # Zod schemas shared with frontend
 │   ├── routes/
 │   │   ├── auth.ts          # /login /register /callback /logout /me
 │   │   ├── wardrobe.ts      # CRUD endpoints for clothing items
@@ -35,6 +34,7 @@ Stylify/
 │       ├── schema/
 │       │   └── items.ts     # items table definition + Zod schemas
 │       └── migrations/      # Drizzle migration SQL files
+├── shared/                  # @stylify/shared: Zod schemas used by server and frontend
 ├── frontend/                # React SPA (Vite)
 │   └── src/
 │       ├── main.tsx         # QueryClient + Router bootstrap

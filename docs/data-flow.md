@@ -282,13 +282,13 @@ nearly impossible for corrupt data to reach storage.
 
 ### The Shared Schema — One Definition, Three Places
 
-All three layers use **the same Zod schema**, defined once in `server/sharedTypes.ts`
+All three layers use **the same Zod schema**, defined once in `shared/src/index.ts`
 and imported by both the backend and the frontend:
 
 ```
-server/db/schema/items.ts      Drizzle table + createInsertSchema()
+shared/src/index.ts            createItemSchema (the client contract)
         ↓
-server/sharedTypes.ts          .omit({ userId, createdAt, id }) → createItemSchema
+server/db/schema/items.ts      insertItemsSchema = createItemSchema + userId
         ↓
         ├── server/routes/wardrobe.ts    zValidator('json', createItemSchema)  [Layer 2]
         │
@@ -610,7 +610,7 @@ App reloads → _authenticated.beforeLoad fires
 | Route protection | TanStack Router `beforeLoad` + `_authenticated` layout |
 | Token storage & verification | Kinde SDK + httpOnly cookies (server-side only) |
 | Form state & per-field validation | TanStack Form (Layer 1) |
-| Shared validation schema | Zod `createItemSchema` in `server/sharedTypes.ts` |
+| Shared validation schema | Zod `createItemSchema` in `shared/src/index.ts` |
 | Request body validation | Hono `zValidator` middleware (Layer 2) |
 | Data integrity guarantee | Postgres `NOT NULL` constraints via Drizzle schema (Layer 3) |
 | Type-safe API calls | Hono RPC client (`hc<AppType>`) |

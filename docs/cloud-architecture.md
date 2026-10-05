@@ -69,24 +69,25 @@ The `server/Dockerfile` is the packing instructions:
 
 ```dockerfile
 FROM public.ecr.aws/awsguru/aws-lambda-adapter:0.9.0 AS aws-lambda-adapter
-FROM oven/bun:debian
-# ↑ "start with a box that has Bun pre-installed"
+FROM oven/bun:1.3.13-debian
 
 COPY --from=aws-lambda-adapter /lambda-adapter /opt/extensions/lambda-adapter
-# ↑ include the Lambda Adapter (explained below)
 
 ENV PORT=8080
 WORKDIR /var/task
 
+# Bun needs the manifest of every workspace listed in the root package.json,
+# or it fails with "Workspace not found". --filter installs only server's deps.
 COPY package.json bun.lockb ./
-RUN bun install --production --frozen-lockfile
-# ↑ install dependencies inside the box
+COPY server/package.json ./server/
+COPY shared/package.json ./shared/
+COPY frontend/package.json ./frontend/
+RUN bun install --production --frozen-lockfile --filter server
 
 COPY server/ ./server/
-# ↑ put your server code in the box
+COPY shared/ ./shared/
 
 CMD ["bun", "server/index.ts"]
-# ↑ when the box is opened (container starts), run this
 ```
 
 Running `docker build` follows these instructions and produces a **Docker image** — a
@@ -118,18 +119,17 @@ somewhere — AWS-internal, so the transfer is fast and free.
 
 ```bash
 # 1. Create the ECR repository (one time only)
-aws ecr create-repository --repository-name stylify-backend --region us-east-2
+aws ecr create-repository --repository-name wardrobe-app --region us-east-1
 
 # 2. Authenticate Docker to ECR
-aws ecr get-login-password --region us-east-2 | \
-  docker login --username AWS --password-stdin <account-id>.dkr.ecr.us-east-2.amazonaws.com
+aws ecr get-login-password --region us-east-1 | \
+  docker login --username AWS --password-stdin 779846779460.dkr.ecr.us-east-1.amazonaws.com
 
-# 3. Build, tag, and push the image (run from repo root)
-docker build -t stylify-backend -f server/Dockerfile .
-docker tag stylify-backend:latest \
-  <account-id>.dkr.ecr.us-east-2.amazonaws.com/stylify-backend:latest
-docker push \
-  <account-id>.dkr.ecr.us-east-2.amazonaws.com/stylify-backend:latest
+# 3. Build and push the image (run from repo root)
+docker build --platform linux/amd64 --provenance=false \
+  -t 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest \
+  -f server/Dockerfile .
+docker push 779846779460.dkr.ecr.us-east-1.amazonaws.com/wardrobe-app:latest
 ```
 
 ---
@@ -231,7 +231,12 @@ Your entire Hono codebase — routes, middleware, auth — runs completely uncha
 - `DATABASE_URL`
 - `KINDE_DOMAIN`, `KINDE_CLIENT_ID`, `KINDE_CLIENT_SECRET`
 - `KINDE_REDIRECT_URI`, `KINDE_LOGOUT_REDIRECT_URI`
-- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+- `KINDE_AUDIENCE` (the API audience registered in Kinde; bearer tokens are rejected without it)
+- `FRONTEND_URL`
+- `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`
+- `GEMINI_API_KEY`
+
+S3 access comes from the Lambda execution role, not from access keys.
 
 ---
 
@@ -367,10 +372,10 @@ S3 stores these files and can serve them to browsers like a simple file server i
 cd frontend && bun run build
 
 # Create the S3 bucket
-aws s3 mb s3://stylify-frontend-yourname --region us-east-2
+aws s3 mb s3://stylify-frontend --region us-east-1
 
 # Upload the build output
-aws s3 sync dist/ s3://stylify-frontend-yourname/
+aws s3 sync dist/ s3://stylify-frontend/
 ```
 
 S3 is configured with **public access blocked** — CloudFront accesses it privately
@@ -378,12 +383,12 @@ via Origin Access Control (OAC). Browsers never talk to S3 directly.
 
 ### What is CloudFront?
 
-S3 alone has a latency problem: if your bucket is in `us-east-2` (Ohio) and someone
+S3 alone has a latency problem: if your bucket is in `us-east-1` (Virginia) and someone
 visits from Tokyo, every file request crosses the Pacific Ocean.
 
 **CloudFront is a CDN (Content Delivery Network).** It has servers in ~600 locations
 worldwide called **edge locations**. When someone requests your site, they get files
-from the nearest edge location, not from Ohio:
+from the nearest edge location, not from Virginia:
 
 ```
 User in Tokyo                          User in London
@@ -393,7 +398,7 @@ CloudFront edge (Tokyo)          CloudFront edge (London)
       │                                      │
       └─────────────────┬────────────────────┘
                         ↓ fetches from S3 once, then caches at the edge
-                   S3 bucket (Ohio)
+                   S3 bucket (Virginia)
 ```
 
 CloudFront also:
@@ -469,7 +474,7 @@ It all looks like one seamless domain.
 3. Browser connects to nearest CloudFront edge
 4. CloudFront: path "/" matches default behavior → S3 origin
 5. CloudFront checks edge cache → if cached, returns immediately
-6. If not cached: CloudFront fetches index.html from S3 (Ohio)
+6. If not cached: CloudFront fetches index.html from S3 (Virginia)
 7. Browser receives index.html, downloads JS bundle
 8. React app boots, TanStack Router renders the matched route
 ```
@@ -525,8 +530,8 @@ Deployments are handled automatically by two workflows in `.github/workflows/`:
 
 | Workflow | File | Trigger |
 |---|---|---|
-| Deploy Backend | `deploy-backend.yml` | Push to `main` touching `server/`, `package.json`, or `bun.lockb` |
-| Deploy Frontend | `deploy-frontend.yml` | Push to `main` touching `frontend/` |
+| Deploy Backend | `deploy-backend.yml` | Push to `main` touching `server/`, `shared/`, the root `package.json`, or the workflow file. Runs `bun test server` first. |
+| Deploy Frontend | `deploy-frontend.yml` | Push to `main` touching `frontend/`, `shared/`, the root `package.json`, or the workflow file |
 
 Both can also be triggered manually from the **Actions** tab in GitHub (useful if you want to force a redeploy without a code change).
 
@@ -555,6 +560,15 @@ aws lambda update-function-code \
 cd frontend && bun run build
 aws s3 sync dist/ s3://stylify-frontend/ --delete --region us-east-1
 aws cloudfront create-invalidation --distribution-id EIH8J5L7N96GZ --paths "/*" --region us-east-1
+```
+
+### Check the Image Locally Before Pushing
+
+```bash
+docker build -t stylify-server:local -f server/Dockerfile .
+docker run --rm -d --name stylify-local -p 8081:8080 --env-file .env stylify-server:local
+curl -s -o /dev/null -w '%{http_code}\n' --retry 10 --retry-connrefused --retry-delay 1 http://localhost:8081/api/me   # 401
+docker stop stylify-local
 ```
 
 ### Smoke Tests After Deploy

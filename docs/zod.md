@@ -80,7 +80,7 @@ export const insertItemsSchema = createInsertSchema(items, {
 
 ## Sharing the Schema Between Backend and Frontend
 
-**`server/sharedTypes.ts`:**
+**`shared/src/index.ts`:**
 ```ts
 import { z } from 'zod'
 import { insertItemsSchema } from './db/schema/items'
@@ -101,8 +101,8 @@ The frontend imports this via the `@server` path alias (configured in `vite.conf
 
 ```ts
 // frontend/src/routes/_authenticated/create-item.tsx
-import { createItemSchema } from '@server/sharedTypes'
-import type { createItem } from '@server/sharedTypes'
+import { createItemSchema } from '@stylify/shared'
+import type { createItem } from '@stylify/shared'
 ```
 
 This is the key architectural decision: **one schema, used in three places:**

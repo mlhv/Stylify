@@ -1071,6 +1071,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **The Dockerfile must copy the `package.json` of every workspace** listed in the root `package.json`. Bun stops with `Workspace not found` otherwise. If you add a workspace, add its manifest to `server/Dockerfile` and check the image builds: `docker build -f server/Dockerfile .`
 - **Before pushing a backend change,** build the image and confirm `GET /api/me` returns 401 from the container. `docs/cloud-architecture.md` has the commands.
 - **React is pinned to one exact version** (`react` and `react-dom`, in `frontend/package.json` and root `overrides`). It must equal the version the Expo SDK in `mobile/` requires; two copies of React in one app break hooks at runtime. Change it only together with an Expo SDK upgrade, and check `find node_modules -path '*node_modules/react/package.json'` prints one line.
+- **The frontend typecheck is currently blind.** `frontend/src/lib/api.ts:132` has a syntax error, which makes `tsc` stop before checking types, and `vite build` does not typecheck at all. Behind it are about 15 real type errors. Until that line is fixed, verify frontend changes in a browser and do not cite the typecheck as evidence.
 - **Never print or commit `.env` values.**
 
 ## Patterns

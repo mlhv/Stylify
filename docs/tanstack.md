@@ -196,7 +196,7 @@ queryClient.setQueryData(loadingCreateItemQueryOptions.queryKey, {})  // clear s
 ```tsx
 import { useForm } from '@tanstack/react-form'
 import { zodValidator } from '@tanstack/zod-form-adapter'
-import { createItemSchema } from '@server/sharedTypes'
+import { createItemSchema } from '@stylify/shared'
 
 const form = useForm({
   defaultValues: { name: '', type: '', size: '', color: '', imageUrl: '' },

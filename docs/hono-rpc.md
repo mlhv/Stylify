@@ -100,7 +100,7 @@ server/db/schema/items.ts        (Drizzle table definition)
         ↓  drizzle-zod
 server/db/schema/items.ts        (insertItemsSchema — Zod schema)
         ↓  .omit({ userId, createdAt, id })
-server/sharedTypes.ts            (createItemSchema — public-facing schema)
+shared/src/index.ts            (createItemSchema — public-facing schema)
         ↓  zValidator('json', createItemSchema) on the Hono route
 server/routes/wardrobe.ts        (route handler with validated input type)
         ↓  export type AppType = typeof app
