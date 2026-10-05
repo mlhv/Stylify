@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "bunx --bun vite",
     "build": "bunx --bun vite build",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -18,7 +19,7 @@
     "@tanstack/react-form": "^0.32.0",
     "@tanstack/react-query": "^5.56.2",
     "@tanstack/react-router": "^1.57.15",
-    "@tanstack/zod-form-adapter": "^0.33.0",
+    "@tanstack/zod-form-adapter": "^0.32.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.10",

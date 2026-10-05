@@ -7,8 +7,6 @@ const s3 = new S3Client({
     region: process.env.AWS_BUCKET_REGION,
 });
 
-const maxFileSize = 1024 * 1024 * 10; // 10 MB
-
 export const signedUrlRoute = new Hono()
     .get('/', getUser, async (c) => {
         try {

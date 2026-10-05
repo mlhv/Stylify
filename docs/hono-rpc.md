@@ -29,9 +29,12 @@ The contract between client and server lives only in documentation or convention
 ```ts
 // server/app.ts
 const app = new Hono()
-  .route('/api', authRoutes)
-  .route('/api', wardrobeRoutes)
-  .route('/api', signedUrlRoutes)
+
+const apiRoutes = app.basePath('/api')
+  .route('/', authRoute)
+  .route('/signed-url', signedUrlRoute)
+  .route('/wardrobe', wardrobeRoute)
+  .route('/recommendations', recommendationsRoute)
 
 export type ApiRoutes = typeof apiRoutes  // ← the entire API shape as a TypeScript type
 ```
@@ -97,10 +100,9 @@ If you get the parameter name wrong, or send the wrong body shape, **TypeScript 
 
 ```
 shared/src/index.ts              (createItemSchema — z.object, the client contract)
-        ↓  .extend({ userId }) on the server
-server/db/schema/items.ts        (insertItemsSchema — server insert schema)
         ↓  zValidator('json', createItemSchema) on the Hono route
-server/routes/wardrobe.ts        (route handler with validated input type)
+server/routes/wardrobe.ts        (route handler with validated input type;
+                                  adds userId via insertItemsSchema from server/db/schema/items.ts)
         ↓  export type ApiRoutes = typeof apiRoutes
 server/app.ts                    (ApiRoutes — full API type)
         ↓  hc<ApiRoutes>('/')

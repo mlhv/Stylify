@@ -47,6 +47,10 @@ export async function getAllItems() {
     return data
 }
   
+// The routes that can answer c.notFound() lose their response type in the RPC
+// client, so their results are asserted to this shape instead.
+export type Item = Awaited<ReturnType<typeof getAllItems>>['items'][number]
+
 export const getAllItemsQueryOptions = queryOptions({
     queryKey: ['get-all-items'],
     queryFn: getAllItems,
@@ -97,7 +101,7 @@ export async function editItem({ id, value }: { id: number; value: createItem })
   if (!res.ok) {
     throw new Error('Network response was not ok')
   }
-  const updatedItem = await res.json()
+  const updatedItem = (await res.json()) as Item
   return updatedItem
 }
 
@@ -114,7 +118,7 @@ export async function getItem({ id }: { id: number }) {
   if (!res.ok) {
     throw new Error('Network response was not ok')
   }
-  const data = await res.json()
+  const data = (await res.json()) as { item: Item }
   return data
 }
 
@@ -129,7 +133,7 @@ export async function markAsWorn({ id }: { id: number }) {
   if (!res.ok) {
     throw new Error('Failed to mark item as worn')
   }
-  return res.json() as Promise<{ item: typeof getAllItems extends () => Promise<{ items: infer I[] }> ? I : never }>
+  return res.json() as Promise<{ item: Item }>
 }
 
 export async function getRecommendations({ lat, lon }: { lat: number; lon: number }) {

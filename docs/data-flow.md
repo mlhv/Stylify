@@ -280,10 +280,11 @@ of what code ran above.
 Removing any one of them means something can slip through. Together, they make it
 nearly impossible for corrupt data to reach storage.
 
-### The Shared Schema — One Definition, Three Places
+### The Shared Schema — One Definition, Two Layers
 
-All three layers use **the same Zod schema**, defined once in `shared/src/index.ts`
-and imported by both the backend and the frontend:
+Layers 1 and 2 use **the same Zod schema**, defined once in `shared/src/index.ts`
+and imported by both the backend and the frontend. Layer 3 is the database's own
+constraints, which come from the Drizzle table:
 
 ```
 shared/src/index.ts            createItemSchema (the client contract)

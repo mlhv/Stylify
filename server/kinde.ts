@@ -14,8 +14,6 @@ export const kindeClient = createKindeServerClient(GrantType.AUTHORIZATION_CODE,
   logoutRedirectURL: process.env.KINDE_LOGOUT_REDIRECT_URI!,
 });
 
-let store: Record<string, unknown> = {};
-
 export const sessionManager = (c: Context): SessionManager => ({
   async getSessionItem(key: string) {
     const result = getCookie(c, key);

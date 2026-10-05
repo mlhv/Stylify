@@ -114,10 +114,10 @@ function EditItem() {
   useEffect(() => {
     if (itemData?.item) {
       // Use setValue for each field instead of reset
-      form.setFieldValue('name', itemData.item.name)
-      form.setFieldValue('type', itemData.item.type)
-      form.setFieldValue('size', itemData.item.size)
-      form.setFieldValue('color', itemData.item.color)
+      form.setFieldValue('name', itemData.item.name ?? '')
+      form.setFieldValue('type', itemData.item.type ?? '')
+      form.setFieldValue('size', itemData.item.size ?? '')
+      form.setFieldValue('color', itemData.item.color ?? '')
       form.setFieldValue('imageUrl', itemData.item.imageUrl)
       setImageUrl(itemData.item.imageUrl)
     }

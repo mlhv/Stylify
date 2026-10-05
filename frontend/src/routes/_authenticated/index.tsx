@@ -64,7 +64,7 @@ function Items() {
                 <CardHeader className="p-0 relative">
                   <img
                     src={item.imageUrl || '/api/placeholder/400/320'}
-                    alt={item.name}
+                    alt={item.name ?? ''}
                     className="w-full h-48 object-cover"
                   />
                   {/* Edit/Close button - always visible on mobile, visible on hover/select on desktop */}

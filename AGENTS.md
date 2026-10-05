@@ -33,9 +33,10 @@ Bun is pinned to 1.3.13 locally, in CI and in the Dockerfile.
 bun install                      # all workspaces, from the root
 bun run dev                      # API on :8080
 bun run dev:frontend             # Vite on :5173, proxies /api to :8080
-bun test ./server                  # server tests
+bun test ./server                # server tests
 (cd server && bunx tsc --noEmit) # server typecheck
-(cd frontend && bun run build)   # frontend build
+(cd frontend && bun run typecheck) # frontend typecheck (also runs in CI before the build)
+(cd frontend && bun run build)   # frontend build (does not typecheck)
 ```
 
 Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`, then `bun migrate.ts`.
@@ -47,7 +48,9 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **The Dockerfile must copy the `package.json` of every workspace** listed in the root `package.json`. Bun stops with `Workspace not found` otherwise. If you add a workspace, add its manifest to `server/Dockerfile` and check the image builds: `docker build -f server/Dockerfile .`
 - **Before pushing a backend change,** build the image and confirm `GET /api/me` returns 401 from the container. `docs/cloud-architecture.md` has the commands.
 - **React is pinned to one exact version** (`react` and `react-dom`, in `frontend/package.json` and root `overrides`). It must equal the version the Expo SDK in `mobile/` requires; two copies of React in one app break hooks at runtime. Change it only together with an Expo SDK upgrade, and check `find node_modules -path '*node_modules/react/package.json'` prints one line.
-- **The frontend typecheck is currently blind.** `frontend/src/lib/api.ts:132` has a syntax error, which makes `tsc` stop before checking types, and `vite build` does not typecheck at all. Behind it are about 15 real type errors. Until that line is fixed, verify frontend changes in a browser and do not cite the typecheck as evidence.
+- **Typecheck the frontend yourself.** `vite build` does not typecheck; `bun run typecheck` in `frontend/` does, and the frontend deploy runs it before building, so a type error blocks the deploy. The frontend's `tsconfig` also checks the server files it imports types from, with `noUnusedLocals` on, so an unused variable in `server/` can fail the frontend typecheck.
+- **`@tanstack/react-form` and `@tanstack/zod-form-adapter` must be on the same minor version** (both 0.32 today). A mismatch still runs but breaks the form validator types.
+- **Routes that return `c.notFound()` lose their response type in the RPC client.** `frontend/src/lib/api.ts` asserts those results to the `Item` type; keep that in mind when changing what `GET`/`PUT /api/wardrobe/:id` return.
 - **Never print or commit `.env` values.**
 
 ## Patterns

@@ -60,8 +60,11 @@ export const items = pgTable('items', {
   type:      varchar('type', { length: 256 }),
   color:     varchar('color', { length: 256 }),
   createdAt: timestamp('created_at').defaultNow(),
+  lastWornAt: timestamp('last_worn_at'),
   imageUrl:  text('image_url').notNull(),
-})
+}, (items) => ({
+  userIdIndex: index('name_idx').on(items.userId),
+}))
 
 // 2. Server-side insert schema = client contract + userId injected by the route
 export const insertItemsSchema = createItemSchema.extend({
