@@ -33,7 +33,7 @@ const app = new Hono()
   .route('/api', wardrobeRoutes)
   .route('/api', signedUrlRoutes)
 
-export type AppType = typeof app  // ← the entire API shape as a TypeScript type
+export type ApiRoutes = typeof apiRoutes  // ← the entire API shape as a TypeScript type
 ```
 
 **Step 2 — Frontend creates a typed client**
@@ -41,12 +41,12 @@ export type AppType = typeof app  // ← the entire API shape as a TypeScript ty
 ```ts
 // frontend/src/lib/api.ts
 import { hc } from 'hono/client'
-import type { AppType } from '../../server/app'
+import type { ApiRoutes } from '@server/app'
 
-export const api = hc<AppType>('/')
+export const api = hc<ApiRoutes>('/')
 ```
 
-`hc<AppType>` creates a proxy object that mirrors the exact structure of your Hono routes.
+`hc<ApiRoutes>` creates a proxy object that mirrors the exact structure of your Hono routes.
 
 **Step 3 — Call endpoints like typed functions**
 
@@ -101,12 +101,12 @@ shared/src/index.ts              (createItemSchema — z.object, the client cont
 server/db/schema/items.ts        (insertItemsSchema — server insert schema)
         ↓  zValidator('json', createItemSchema) on the Hono route
 server/routes/wardrobe.ts        (route handler with validated input type)
-        ↓  export type AppType = typeof app
-server/app.ts                    (AppType — full API type)
-        ↓  hc<AppType>('/')
+        ↓  export type ApiRoutes = typeof apiRoutes
+server/app.ts                    (ApiRoutes — full API type)
+        ↓  hc<ApiRoutes>('/')
 frontend/src/lib/api.ts          (api — typed RPC client)
         ↓  api.wardrobe.$post({ json: value })
 frontend/src/routes/...          (fully typed call sites)
 ```
 
-Every layer flows into the next through TypeScript's type system. You change the DB schema, and the type error propagates all the way to the frontend call site automatically.
+Every layer flows into the next through TypeScript's type system. Changing `createItemSchema` or a route's response propagates type errors all the way to the frontend call site automatically. The DB table is defined separately and is not part of this chain.

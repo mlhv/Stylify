@@ -124,7 +124,7 @@ wardrobeRoute.get('/', getUser, async (c) => {
 
 The code is in `server/auth/`:
 
-- `bearer.ts` verifies the token with `jose`: signature against Kinde's JWKS (`<KINDE_DOMAIN>/.well-known/jwks`, fetched once and cached), issuer equal to `KINDE_DOMAIN`, audience equal to `KINDE_AUDIENCE`, algorithm RS256, and an unexpired `exp`. The user ID is the token's `sub` claim.
+- `bearer.ts` verifies the token with `jose`: signature against Kinde's JWKS (`<KINDE_DOMAIN>/.well-known/jwks`, the key set is cached for about 10 minutes and refetched when a token names an unknown key ID), issuer equal to `KINDE_DOMAIN`, audience equal to `KINDE_AUDIENCE`, algorithm RS256, and an unexpired `exp`. The user ID is the token's `sub` claim.
 - `getUser.ts` chooses the path. A bearer header that fails verification returns `401 {"error":"Invalid token"}` and never falls back to cookies. With no bearer header, the cookie logic above runs unchanged.
 
 On the bearer path only `c.var.user.id` is set; access tokens carry no name or email. Route handlers should use `user.id` only.
@@ -183,5 +183,9 @@ When an item is deleted, the backend extracts the S3 key from the stored URL and
 | `KINDE_REDIRECT_URI` | OAuth callback URL (`/api/callback`) |
 | `KINDE_LOGOUT_REDIRECT_URI` | Post-logout redirect URL |
 | `KINDE_AUDIENCE` | API audience registered in Kinde; required for bearer tokens |
-| `AWS_ACCESS_KEY_ID` | AWS credentials for S3 |
-| `AWS_SECRET_ACCESS_KEY` | AWS credentials for S3 |
+| `AWS_BUCKET_NAME` | Image bucket name |
+| `AWS_BUCKET_REGION` | Image bucket region |
+| `FRONTEND_URL` | Where `/api/callback` redirects after login |
+| `GEMINI_API_KEY` | Gemini API key for outfit recommendations |
+
+S3 access comes from the Lambda execution role, not from access keys.

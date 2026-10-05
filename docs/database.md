@@ -25,7 +25,7 @@ The `-pooler` subdomain in the URL means it's using **connection pooling** (PgBo
 - Drizzle generates **no runtime abstraction layer** — queries compile down to SQL and run directly. This makes it fast and predictable.
 - The schema is written in TypeScript (not a separate `.prisma` file), so it lives alongside your code.
 - It has a companion tool, **Drizzle Kit**, for generating and running SQL migrations.
-- It integrates with **drizzle-zod** to auto-generate Zod validation schemas directly from your table definitions — so your DB shape and your validation shape are always in sync.
+- Validation schemas come from `@stylify/shared`, not from the table; drizzle-zod is no longer used, so a new field must be added to both the table and `createItemSchema`.
 
 **Connection setup** (`server/db/index.ts`):
 ```ts

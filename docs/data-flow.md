@@ -293,11 +293,11 @@ server/db/schema/items.ts      insertItemsSchema = createItemSchema + userId
         ├── server/routes/wardrobe.ts    zValidator('json', createItemSchema)  [Layer 2]
         │
         └── frontend/src/routes/        createItemSchema.shape.name  [Layer 1]
-            create-item.tsx             (imported via @server alias)
+            create-item.tsx             (imported from @stylify/shared)
 ```
 
-The DB schema and validation schema are always in sync — you can't add a field to
-one without it affecting the other.
+The Drizzle table and `createItemSchema` are defined separately, so a new field
+must be added to both.
 
 ---
 
@@ -613,7 +613,7 @@ App reloads → _authenticated.beforeLoad fires
 | Shared validation schema | Zod `createItemSchema` in `shared/src/index.ts` |
 | Request body validation | Hono `zValidator` middleware (Layer 2) |
 | Data integrity guarantee | Postgres `NOT NULL` constraints via Drizzle schema (Layer 3) |
-| Type-safe API calls | Hono RPC client (`hc<AppType>`) |
+| Type-safe API calls | Hono RPC client (`hc<ApiRoutes>`) |
 | Request caching & deduplication | TanStack Query (`queryClient`) |
 | Optimistic UI updates | Manual `queryClient.setQueryData()` after mutations |
 | Image storage | S3 via presigned URL (browser uploads directly, bypasses backend) |

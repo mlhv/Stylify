@@ -42,7 +42,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 
 ## Rules that are easy to break
 
-- **Pushing to `main` deploys.** Changes under `server/`, `shared/`, `frontend/` or the root `package.json` trigger the GitHub Actions workflows, which update the live site. Ask the owner before pushing to `main`. Work on a branch and fast-forward.
+- **Pushing to `main` deploys.** Changes under `server/`, `shared/`, `frontend/` or the root `package.json` trigger the GitHub Actions workflows, which update the live site. Ask the owner before pushing to `main`. Work on a branch and fast-forward. A lockfile-only change does not deploy, so a re-resolved transitive server dependency ships with the next server deploy.
 - **Both deploys install with `--frozen-lockfile`.** After changing any `package.json`, run `bun install` at the root and commit `bun.lockb`, or the deploy fails.
 - **The Dockerfile must copy the `package.json` of every workspace** listed in the root `package.json`. Bun stops with `Workspace not found` otherwise. If you add a workspace, add its manifest to `server/Dockerfile` and check the image builds: `docker build -f server/Dockerfile .`
 - **Before pushing a backend change,** build the image and confirm `GET /api/me` returns 401 from the container. `docs/cloud-architecture.md` has the commands.
@@ -64,7 +64,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - Backend: Lambda `stylifyServer` (us-east-1) from ECR `wardrobe-app`, behind API Gateway HTTP API `qc21edd692`.
 - Images: S3 bucket `stylify-local-minh` (us-east-2).
 - CloudFront sends `/api/*` to API Gateway and everything else to S3. The `/api/*` behaviour must use the `AllViewerExceptHostHeader` origin request policy; `AllViewer` makes API Gateway return 403.
-- Lambda environment variables: `DATABASE_URL`, `KINDE_DOMAIN`, `KINDE_CLIENT_ID`, `KINDE_CLIENT_SECRET`, `KINDE_REDIRECT_URI`, `KINDE_LOGOUT_REDIRECT_URI`, `KINDE_AUDIENCE`, `FRONTEND_URL`, `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`, `GEMINI_API_KEY`.
+- Lambda environment variables: `DATABASE_URL`, `KINDE_DOMAIN`, `KINDE_CLIENT_ID`, `KINDE_CLIENT_SECRET`, `KINDE_REDIRECT_URI`, `KINDE_LOGOUT_REDIRECT_URI`, `KINDE_AUDIENCE` (required for bearer auth; may not be set yet, and bearer requests are rejected until it is), `FRONTEND_URL`, `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`, `GEMINI_API_KEY`.
 
 Smoke test after any deploy:
 
