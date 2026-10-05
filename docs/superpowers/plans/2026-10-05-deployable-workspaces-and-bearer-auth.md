@@ -341,8 +341,8 @@ Add this key after `"workspaces"`:
 ```bash
 bun install
 bun install --frozen-lockfile
-find node_modules -path '*/node_modules/react/package.json' -exec grep -H '"version"' {} \;
-find node_modules -path '*/node_modules/react-dom/package.json' -exec grep -H '"version"' {} \;
+find node_modules -path '*node_modules/react/package.json' -exec grep -H '"version"' {} \;
+find node_modules -path '*node_modules/react-dom/package.json' -exec grep -H '"version"' {} \;
 ```
 
 Expected: each `find` prints exactly one line, `node_modules/react/package.json` and `node_modules/react-dom/package.json`, both `19.2.3`. Any nested copy means the override is not applied; stop and fix.
@@ -1070,7 +1070,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **Both deploys install with `--frozen-lockfile`.** After changing any `package.json`, run `bun install` at the root and commit `bun.lockb`, or the deploy fails.
 - **The Dockerfile must copy the `package.json` of every workspace** listed in the root `package.json`. Bun stops with `Workspace not found` otherwise. If you add a workspace, add its manifest to `server/Dockerfile` and check the image builds: `docker build -f server/Dockerfile .`
 - **Before pushing a backend change,** build the image and confirm `GET /api/me` returns 401 from the container. `docs/cloud-architecture.md` has the commands.
-- **React is pinned to one exact version** (`react` and `react-dom`, in `frontend/package.json` and root `overrides`). It must equal the version the Expo SDK in `mobile/` requires; two copies of React in one app break hooks at runtime. Change it only together with an Expo SDK upgrade, and check `find node_modules -path '*/node_modules/react/package.json'` prints one line.
+- **React is pinned to one exact version** (`react` and `react-dom`, in `frontend/package.json` and root `overrides`). It must equal the version the Expo SDK in `mobile/` requires; two copies of React in one app break hooks at runtime. Change it only together with an Expo SDK upgrade, and check `find node_modules -path '*node_modules/react/package.json'` prints one line.
 - **Never print or commit `.env` values.**
 
 ## Patterns
