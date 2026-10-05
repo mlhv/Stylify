@@ -43,12 +43,12 @@ Zod also solves a **"two truths" problem**: without it, you'd define the TypeScr
 
 ## Schema Definition
 
-The schema is generated from the Drizzle ORM table definition using **drizzle-zod**. This means the DB schema and the validation schema are always in sync — you can't define a field in one but not the other.
+The client-facing schema, `createItemSchema`, is defined once in the shared package (shown in the next section). The server's insert schema, `insertItemsSchema`, is derived from it by adding `userId`, so the validation rules live in one place.
 
 **`server/db/schema/items.ts`:**
 ```ts
 import { z } from 'zod'
-import { createInsertSchema } from 'drizzle-zod'
+import { createItemSchema } from '@stylify/shared'
 import { pgTable, serial, text, varchar, timestamp, index } from 'drizzle-orm/pg-core'
 
 // 1. Drizzle table definition (used to generate SQL + query types)
@@ -63,18 +63,13 @@ export const items = pgTable('items', {
   imageUrl:  text('image_url').notNull(),
 })
 
-// 2. Zod schema generated from the table — with custom validation rules added
-export const insertItemsSchema = createInsertSchema(items, {
-  id:       z.number().int().positive().min(1),
-  name:     z.string().min(1, 'Name must be at least 1 character long'),
-  type:     z.string().min(1, 'Type must be at least 1 character long'),
-  size:     z.string().min(1, 'Size must be at least 1 character long'),
-  color:    z.string().min(1, 'Color must be at least 1 character long'),
-  imageUrl: z.string().url('Image URL must be a valid URL'),
+// 2. Server-side insert schema = client contract + userId injected by the route
+export const insertItemsSchema = createItemSchema.extend({
+  userId: z.string().min(1),
 })
 ```
 
-`createInsertSchema` reads your Drizzle table and produces a Zod schema shaped for inserts (all columns are present, but auto-generated ones like `id` and `createdAt` are optional). The second argument lets you override the auto-generated validators with your own — this is where custom error messages are added.
+`.extend({ userId })` adds the one field the client must not send. The route fills it in from the auth session, so the shared schema never changes when the table does.
 
 ---
 
@@ -83,13 +78,13 @@ export const insertItemsSchema = createInsertSchema(items, {
 **`shared/src/index.ts`:**
 ```ts
 import { z } from 'zod'
-import { insertItemsSchema } from './db/schema/items'
 
-// Strip fields that the client shouldn't send (server fills them in)
-export const createItemSchema = insertItemsSchema.omit({
-  userId: true,     // server sets this from the auth session
-  createdAt: true,  // server sets this via DB default
-  id: true,         // server auto-generates this
+export const createItemSchema = z.object({
+  name: z.string().min(1, 'Name must be at least 1 character long'),
+  type: z.string().min(1, 'Type must be at least 1 character long'),
+  size: z.string().min(1, 'Size must be at least 1 character long'),
+  color: z.string().min(1, 'Color must be at least 1 character long'),
+  imageUrl: z.string().url('Image URL must be a valid URL'),
 })
 
 // Infer the TypeScript type from the schema
@@ -97,7 +92,7 @@ export type createItem = z.infer<typeof createItemSchema>
 // Result: { name: string; type: string; size: string; color: string; imageUrl: string }
 ```
 
-The frontend imports this via the `@server` path alias (configured in `vite.config.ts` to point to `../server`):
+Both the server and the frontend import it from the `@stylify/shared` workspace package:
 
 ```ts
 // frontend/src/routes/_authenticated/create-item.tsx

@@ -96,11 +96,9 @@ If you get the parameter name wrong, or send the wrong body shape, **TypeScript 
 ## The Full Type Chain
 
 ```
-server/db/schema/items.ts        (Drizzle table definition)
-        ↓  drizzle-zod
-server/db/schema/items.ts        (insertItemsSchema — Zod schema)
-        ↓  .omit({ userId, createdAt, id })
-shared/src/index.ts            (createItemSchema — public-facing schema)
+shared/src/index.ts              (createItemSchema — z.object, the client contract)
+        ↓  .extend({ userId }) on the server
+server/db/schema/items.ts        (insertItemsSchema — server insert schema)
         ↓  zValidator('json', createItemSchema) on the Hono route
 server/routes/wardrobe.ts        (route handler with validated input type)
         ↓  export type AppType = typeof app
