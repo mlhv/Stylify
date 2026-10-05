@@ -21,7 +21,7 @@
 - Bearer verification checks signature (Kinde JWKS), issuer (`KINDE_DOMAIN`), audience (`KINDE_AUDIENCE`) and expiry.
 - The server must boot and serve cookie-authenticated requests even when `KINDE_AUDIENCE` is not set.
 - Do not print or commit values from `.env`.
-- Known baseline: `cd frontend && bunx tsc -p tsconfig.app.json --noEmit` reports exactly one pre-existing error (`src/lib/api.ts(132,97): error TS1005`). Do not fix it here; do not add others. `cd server && bunx tsc --noEmit` is clean.
+- Known baseline: `cd frontend && bunx tsc -p tsconfig.app.json --noEmit` reports one syntax error (`src/lib/api.ts(132,97): error TS1005`). **Correction, found during Task 4 review:** that syntax error makes `tsc` skip all type checking, so this check proves nothing about types. With the syntax patched temporarily, the frontend has 15 real type errors, all in code this plan does not change in substance (TanStack Form validator types in `create-item.tsx` and `edit-item.$id.tsx`, untyped values in `edit-item.$id.tsx`, a nullable `alt` in `index.tsx`, three unused declarations). None come from the optional `/api/me` fields. Fixing them is out of scope here. `cd server && bunx tsc --noEmit` is clean and is a real check. The frontend build (`vite build`) does not typecheck.
 - Rollback for any bad deploy: `git revert --no-edit <bad commits>` on `main`, then push (after telling Minh). The workflows redeploy the previous code.
 
 ## Review Focus
