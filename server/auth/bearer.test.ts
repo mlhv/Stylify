@@ -100,6 +100,27 @@ describe('createBearerVerifier', () => {
     await expect(verifier()(token)).rejects.toBeInstanceOf(BearerAuthError)
   })
 
+  test('rejects a token signed with an algorithm other than RS256', async () => {
+    const psKeys = await generateKeyPair('PS256')
+    const psJwk = await exportJWK(psKeys.publicKey)
+    // No `alg` on the JWK, so the key set itself would accept a PS256 signature.
+    const psJwks = createLocalJWKSet({ keys: [{ ...psJwk, kid: 'ps-key' }] })
+    const now = Math.floor(Date.now() / 1000)
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'PS256', kid: 'ps-key' })
+      .setIssuer(ISSUER)
+      .setAudience([AUDIENCE])
+      .setSubject(SUBJECT)
+      .setExpirationTime(now + 300)
+      .sign(psKeys.privateKey)
+    await expect(verifier({ jwks: psJwks })(token)).rejects.toBeInstanceOf(BearerAuthError)
+  })
+
+  test('rejects a token with an empty subject', async () => {
+    const token = await makeToken({ subject: '' })
+    await expect(verifier()(token)).rejects.toBeInstanceOf(BearerAuthError)
+  })
+
   test('rejects garbage and the empty string', async () => {
     await expect(verifier()('not-a-jwt')).rejects.toBeInstanceOf(BearerAuthError)
     await expect(verifier()('')).rejects.toBeInstanceOf(BearerAuthError)

@@ -12,6 +12,6 @@
     "dev": "bun --watch server/index.ts",
     "dev:frontend": "cd frontend && bun run dev",
     "dev:all": "bun run dev & bun run dev:frontend",
-    "test": "bun test server"
+    "test": "bun test ./server"
   }
 }

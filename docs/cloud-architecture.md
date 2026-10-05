@@ -530,7 +530,7 @@ Deployments are handled automatically by two workflows in `.github/workflows/`:
 
 | Workflow | File | Trigger |
 |---|---|---|
-| Deploy Backend | `deploy-backend.yml` | Push to `main` touching `server/`, `shared/`, the root `package.json`, or the workflow file. Runs `bun test server` first. |
+| Deploy Backend | `deploy-backend.yml` | Push to `main` touching `server/`, `shared/`, the root `package.json`, or the workflow file. Runs `bun test ./server` first. |
 | Deploy Frontend | `deploy-frontend.yml` | Push to `main` touching `frontend/`, `shared/`, the root `package.json`, or the workflow file |
 
 Both can also be triggered manually from the **Actions** tab in GitHub (useful if you want to force a redeploy without a code change).

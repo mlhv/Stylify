@@ -33,7 +33,7 @@ Bun is pinned to 1.3.13 locally, in CI and in the Dockerfile.
 bun install                      # all workspaces, from the root
 bun run dev                      # API on :8080
 bun run dev:frontend             # Vite on :5173, proxies /api to :8080
-bun test server                  # server tests
+bun test ./server                  # server tests
 (cd server && bunx tsc --noEmit) # server typecheck
 (cd frontend && bun run build)   # frontend build
 ```

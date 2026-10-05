@@ -1,4 +1,4 @@
-import { describe, expect, mock, test } from 'bun:test'
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { Hono } from 'hono'
 import { bearerToken, createGetUser, type AuthUser, type GetUserDeps } from './getUser'
 
@@ -39,6 +39,14 @@ describe('bearerToken', () => {
 })
 
 describe('createGetUser', () => {
+  let errorSpy: ReturnType<typeof spyOn>
+  beforeEach(() => {
+    errorSpy = spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    errorSpy.mockRestore()
+  })
+
   test('valid bearer token: sets the user and skips cookies', async () => {
     const { deps, request } = setup()
     const res = await request({ Authorization: 'Bearer good' })

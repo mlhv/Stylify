@@ -45,7 +45,8 @@ export const sessionManager = (c: Context): SessionManager => ({
 });
 
 // The key set is fetched on first use and cached. Built only when the domain is
-// set, so a missing variable disables bearer auth instead of crashing at import.
+// set: an unset KINDE_DOMAIN disables bearer auth. A value that is not a full URL
+// still throws at import, as it already would for Kinde login.
 const kindeDomain = (process.env.KINDE_DOMAIN ?? '').replace(/\/+$/, '');
 
 const verifyBearer = createBearerVerifier({
