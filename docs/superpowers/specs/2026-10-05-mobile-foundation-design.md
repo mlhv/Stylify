@@ -61,7 +61,7 @@ mobile/     new Expo app (new workspace)
 `mobile` is a member of the root Bun `workspaces`, sharing the root lockfile. Tested in a throwaway copy on 2026-10-05; three things make that safe:
 
 - **One React.** The web app moves to React 19.2.3, the exact version Expo SDK 57 uses, and the root `package.json` forces it with `overrides`. Without the override, Bun nests React 18 under two web libraries whose peer ranges stop at 18. From then on the web app's React version follows the Expo SDK's.
-- **The backend image.** The Dockerfile copies every workspace manifest, including `mobile/package.json`, and installs with `--filter server`, which keeps React Native out of the image (112 packages in the test).
+- **The backend image.** The Dockerfile copies every workspace manifest, including `mobile/package.json`, and installs with `--filter server --omit=peer`, which keeps React Native out of the image (see Part 3, "Workspace and CI second").
 - **Deploy triggers.** `bun.lockb` is not a trigger for either workflow, so mobile dependency changes do not redeploy the web app or the API.
 
 Neither existing workflow triggers on `mobile/**` or on the lockfile, so mobile changes cannot start a web or backend deploy.
@@ -149,7 +149,7 @@ This ships to `main` on its own, before the app depends on it.
 - Add `mobile` to the root `workspaces`; run `bun install`; commit `bun.lockb`.
 - `server/Dockerfile`: copy `mobile/package.json` with the other manifests.
 - `.dockerignore`: add `mobile/.expo`, `mobile/ios`, `mobile/android` and `mobile/dist`, without excluding `mobile/package.json`.
-- Both deploy workflows install with `--filter` so that neither installs React Native.
+- Both deploy workflows and the Dockerfile install with `--filter` and `--omit=peer` so that none installs React Native. `--filter` alone is not enough: the server's Kinde SDK has an optional peer, `expo-secure-store`, which Bun installs (with Expo and React Native) once `mobile/` puts it in the lockfile. Found on 2026-10-06 while writing the plan.
 - No workflow triggers on `mobile/**`.
 
 Adding a workspace edits the root `package.json`, which triggers both deploys. Before that push: build the image, confirm `GET /api/me` returns 401 from the container, and run the frontend typecheck and build. After it: the smoke test in `AGENTS.md`.
