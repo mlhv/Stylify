@@ -1,7 +1,7 @@
 # Mobile Foundation — Design
 
 Date: 2026-10-05
-Status: awaiting review
+Status: Parts 1 and 2 shipped; Part 3 revised 2026-10-06, awaiting review
 
 ## Goal
 
@@ -12,8 +12,7 @@ The app exists for three reasons: to learn React Native, to have a native app to
 ## Context
 
 - Stylify is live at stylify.space: React + Vite frontend on S3/CloudFront, Hono API on Lambda behind API Gateway, Neon Postgres, Kinde auth, S3 image storage. See `docs/cloud-architecture.md`.
-- A refactor is staged but uncommitted on `main`: the shared Zod schema moves from `server/sharedTypes.ts` to a `shared/` Bun workspace (`@stylify/shared`), the Dockerfile installs from the root lockfile, and both CI workflows also trigger on `shared/**`.
-- The repo has no tests.
+- When this spec was first written, the `shared/` workspace refactor was staged but uncommitted and the repo had no tests. Both changed with plan 1, which is live on `main`: `@stylify/shared`, bearer auth with tests in `server/auth/`, and the web app on React 19.2.3.
 
 ## Scope
 
@@ -38,15 +37,17 @@ Out of scope (each gets its own spec later):
 | Decision | Choice | Reason |
 |---|---|---|
 | Web vs mobile | Add mobile; keep the web app | The web app is built, costs about $0.15/month, and is the only thing openable from a link |
-| Framework | Expo, SDK 54 or later, development builds | `react-native-executorch` (planned for the classifier) requires SDK 54+, a development build, and iOS 17+ |
+| Framework | Expo SDK 57, development builds, iOS 17+ | The current template; `react-native-executorch` 0.10.4 (planned for the classifier) requires SDK 55+, a development build, the New Architecture and iOS 17+ |
 | Platform | iPhone only | One platform to test and one store review; avoid iOS-only libraries so Android stays possible |
 | Routing | Expo Router | File-based, similar to TanStack Router |
-| Styling | NativeWind | Reuses Tailwind knowledge |
+| Styling | NativeWind 4.2.7 (Tailwind 3); `StyleSheet` if it fails on SDK 57 | Reuses Tailwind knowledge on the stable release, with the same Tailwind major as the web app |
 | Server state | TanStack Query | Same as web |
 | Forms | TanStack Form + `createItemSchema` from `@stylify/shared` | Same validation as web and server |
 | API client | Hono RPC client (`hc<ApiRoutes>`) | Keeps calls typed end to end |
 | Auth SDK | `@kinde/expo` (PKCE) | Kinde's supported Expo SDK |
-| Distribution | TestFlight, then App Store | Apple Developer Program, $99/year |
+| Development builds | Local Xcode builds: simulator daily, Minh's iPhone with free provisioning for the camera | Fast iteration, and no paid account needed until release |
+| Auth failures | 401 for a bad token, 503 when the token could not be checked | A Kinde outage must not sign mobile users out |
+| Distribution | TestFlight through EAS, then App Store | Apple Developer Program, $99/year, needed only at this step |
 
 ## Repo layout
 
@@ -70,7 +71,7 @@ Neither existing workflow triggers on `mobile/**` or on the lockfile, so mobile 
 This spec is implemented by two plans:
 
 1. `docs/superpowers/plans/2026-10-05-deployable-workspaces-and-bearer-auth.md` — Parts 1, 2, the web app's move to React 19, and the non-mobile docs in Part 4.
-2. The Expo app (Part 3 and `docs/mobile.md`) — written after plan 1 has shipped and the Kinde and Apple setup is done.
+2. The Expo app (Part 3 and `docs/mobile.md`) — written after plan 1 has shipped. It starts with the 503 change to `server/auth/` described in Part 3.
 
 ## Part 1: Finish the workspace refactor
 
@@ -91,7 +92,7 @@ Then commit, push to `main` (after confirming with Minh), watch both workflows, 
 
 ### Kinde setup (manual, by Minh)
 
-- Create a second application of type "Front-end and mobile" in the same Kinde business, with callback `stylify://callback` and a matching logout redirect. The same business means the same user ID on web and mobile, so one wardrobe per person.
+- Create a second application of type "Front-end and mobile" in the same Kinde business, with the callback and logout redirect the app really uses (Part 3, "Auth", gives the steps; the scheme is `stylify`). The same business means the same user ID on web and mobile, so one wardrobe per person.
 - Register an API in Kinde with an audience (for example `https://stylify.space/api`) and authorise the mobile application for it.
 
 ### Middleware
@@ -102,7 +103,7 @@ Then commit, push to `main` (after confirming with Minh), watch both workflows, 
    - Verify the signature against Kinde's JWKS (`https://<KINDE_DOMAIN>/.well-known/jwks`), with the key set cached in memory.
    - Check issuer (`KINDE_DOMAIN`), audience (`KINDE_AUDIENCE`), and expiry.
    - Set `c.var.user` with `id` taken from the `sub` claim.
-   - On any failure, return 401. Do not fall through to cookies.
+   - On any failure, return 401. Do not fall through to cookies. (Part 3 later splits out 503 for a token that could not be checked.)
 2. If there is no bearer header, run today's cookie logic unchanged.
 
 Routes use only `user.id`, so the bearer path does not fetch a profile from Kinde. The type of `c.var.user` is narrowed to what both paths can supply; `/api/me` keeps returning the full profile on the cookie path and returns the token-derived fields on the bearer path. The mobile profile screen reads name, email and picture from the SDK.
@@ -124,6 +125,49 @@ The live web app is the regression check for the cookie path after deploy.
 
 ## Part 3: The Expo app
 
+Revised 2026-10-06 after plan 1 shipped. The facts marked "verified" come from a throwaway copy of the repo on 2026-10-05; nothing has yet run on a device or simulator.
+
+### Project shape
+
+- Created with `bunx create-expo-app@latest mobile --template default`: Expo SDK 57, React 19.2.3, React Native 0.86.3, source under `mobile/src/`. Delete the `mobile/.git` the template creates.
+- `scheme`: `stylify`. Bundle identifier: `space.stylify.app`. Minimum iOS: 17. New Architecture on. Development builds only; Expo Go is not used. These match what `react-native-executorch` needs for the classifier spec.
+- React stays at 19.2.3, so the pin in `frontend/package.json` and the root `overrides` does not change.
+- `mobile/tsconfig.json` adds `"@server/*": ["../server/*"]` to `paths`, and `mobile` depends on `hono` and `@stylify/shared` (verified: typechecks and bundles with no Metro changes).
+
+### Backend change first: 503 for "could not verify"
+
+Today every bearer failure is a 401, including Kinde's key server being unreachable and missing configuration. The app signs out on a 401 that survives a refresh, so a Kinde outage would sign users out.
+
+- `server/auth/bearer.ts` throws a second error type when the token could not be checked at all: the key set could not be fetched, or `KINDE_DOMAIN` / `KINDE_AUDIENCE` / the key set is missing.
+- `getUser` answers 503 for that error and 401 for every other bearer failure. Neither falls back to cookies.
+- Tests: the existing "network down" and "not configured" cases now expect the new error; new `getUser` tests expect 503 for it and 401 for a bad token.
+
+This ships to `main` on its own, before the app depends on it.
+
+### Workspace and CI second
+
+- Add `mobile` to the root `workspaces`; run `bun install`; commit `bun.lockb`.
+- `server/Dockerfile`: copy `mobile/package.json` with the other manifests.
+- `.dockerignore`: add `mobile/.expo`, `mobile/ios`, `mobile/android` and `mobile/dist`, without excluding `mobile/package.json`.
+- Both deploy workflows install with `--filter` so that neither installs React Native.
+- No workflow triggers on `mobile/**`.
+
+Adding a workspace edits the root `package.json`, which triggers both deploys. Before that push: build the image, confirm `GET /api/me` returns 401 from the container, and run the frontend typecheck and build. After it: the smoke test in `AGENTS.md`.
+
+### Styling
+
+NativeWind 4.2.7 with Tailwind 3, the same Tailwind major as the web app. Its support for Expo SDK 57 is not confirmed, so the scaffold task renders one NativeWind-styled screen in the simulator before anything is built on it. If that fails, the app uses React Native's `StyleSheet` instead and NativeWind is removed; the toolchain is not debugged.
+
+### Building and running
+
+| Stage | How | Needs |
+|---|---|---|
+| Daily development | Local development build (`expo run:ios`) in the iOS Simulator | Xcode, installed by Minh |
+| Camera and the device checklist | The same build installed on Minh's iPhone with free provisioning; it expires after 7 days and is reinstalled | A free Apple ID |
+| TestFlight | EAS Build and EAS Submit | Apple Developer Program enrolment and an Expo account |
+
+Enrolment can take a day or two, so Minh starts it once edit and delete work, not on release day.
+
 ### Screens
 
 | Route | Screen | Behaviour |
@@ -134,11 +178,28 @@ The live web app is the regression check for the cookie path after deploy.
 | `/item/[id]` | Edit | Pre-filled form; delete behind a confirmation |
 | `/(tabs)/profile` | Profile | Name, email, picture, item count, sign out |
 
-Signed-out users are redirected to `/sign-in`.
+Signed-out users are redirected to `/sign-in`. The profile screen reads name, email and picture from the Kinde SDK (`getUserProfile()`), because a bearer token carries only the user ID; the item count comes from the wardrobe query.
+
+### Auth
+
+1. The app prints the redirect URI it will really use (from Expo's `makeRedirectUri` with the `stylify` scheme). Minh then creates a Kinde application of type "Front-end and mobile" in the same business, adds that URI as the callback and logout redirect, and authorises the application for the `Stylify API`.
+2. Sign-in calls `login({ audience: 'https://stylify.space/api' })` from `@kinde/expo` 0.9.0.
+3. Before any other screen is built, a temporary debug screen proves two things with a real token:
+   - the access token's `aud` contains `https://stylify.space/api`;
+   - `GET /api/me` with the bearer token returns the same user ID that the web app's `/api/me` returns for the same person.
+
+If the audience is missing, switch to `expo-auth-session` directly, which the Kinde SDK is built on. If the user IDs differ, stop: web and mobile would have separate wardrobes and this design needs rework.
 
 ### API client
 
-`mobile/lib/api.ts` creates `hc<ApiRoutes>` with base URL `https://stylify.space` and a fetch wrapper that attaches the bearer token. It defines the same `queryOptions` as the web app's `frontend/src/lib/api.ts`. The base URL comes from Expo config so a local backend can be used in development.
+`mobile/src/lib/api.ts` creates `hc<ApiRoutes>` with a fetch wrapper and defines the same `queryOptions` as `frontend/src/lib/api.ts`.
+
+- Base URL: `https://stylify.space`, or `EXPO_PUBLIC_API_URL` when set, for a local backend.
+- The wrapper attaches `Authorization: Bearer <access token>`.
+- 401: refresh the token once through the SDK and retry the request once. If the retry is also 401, or the refresh fails, sign out to `/sign-in`.
+- 503 or a network failure: stay signed in and show "Can't reach the server" with a retry.
+
+The wrapper takes its token functions as arguments so its retry rules can be unit tested without the SDK.
 
 ### Add-item flow
 
@@ -147,23 +208,42 @@ Signed-out users are redirected to `/sign-in`.
 3. `GET /api/signed-url`, `PUT` the file to S3, `POST /api/wardrobe` with the resulting URL.
 4. Write the new item into the query cache with `setQueryData`, as the web app does.
 
-The S3 bucket's CORS rules apply to browsers only, so no bucket change is needed.
+The form is TanStack Form validated by `createItemSchema`. The S3 bucket's CORS rules apply to browsers only, so no bucket change is needed. How the file body is sent in the `PUT` from React Native is settled in the plan against the SDK 57 docs.
 
 ### Error handling
 
-- 401 from the API: refresh the token once through the SDK and retry; if that fails, sign out to `/sign-in`.
+- 401, 503 and network failures: as under "API client".
 - Upload or save failure: keep the form filled in, show the error, offer a retry.
 - Lambda cold start: skeletons, never a blank screen.
 - Camera or photo permission denied: explain and link to Settings.
 
 ### Testing
 
-- Typecheck in `mobile/`.
-- Manual checklist on a physical iPhone through a development build: sign in, see the same items as on the web, add with camera, add from library, edit, delete, sign out, sign back in.
+- `bun test` for the fetch wrapper: token attached; 401 then refresh then success; 401 twice signs out; failed refresh signs out; 503 does not sign out.
+- Typecheck in `mobile/`, and `bunx expo export --platform ios` to prove the bundle builds.
+- Each screen is checked in the simulator as it is built.
+- Manual checklist on Minh's iPhone: sign in, see the same items as on the web, add with camera, add from library, edit, delete, sign out, sign back in.
+
+Local development uses the production database and image bucket, so every test item is deleted afterwards.
+
+### Order of work
+
+1. The 503 change (deploys the API).
+2. Scaffold `mobile/` as a workspace, with the CI and Docker changes and the NativeWind proof (deploys web and API).
+3. Kinde mobile application, sign-in, and the token check.
+4. API client and the wardrobe grid.
+5. Add with a photo.
+6. Edit and delete.
+7. Profile.
+8. Device checklist on the iPhone.
+9. Apple enrolment, EAS Build, TestFlight.
+10. `docs/mobile.md` and the `AGENTS.md` update.
+
+Steps 1 and 2 are pushed to `main` with Minh's agreement. Steps 3 to 10 are built on a feature branch; nothing in `mobile/` triggers a deploy.
 
 ### Release
 
-Built on a feature branch. Development build on Minh's iPhone first, then an EAS Build submitted to TestFlight. Requires Apple Developer Program enrolment and an Expo account (manual, by Minh).
+EAS Build submitted to TestFlight. Requires Apple Developer Program enrolment and an Expo account (manual, by Minh).
 
 ## Part 4: Documentation
 
@@ -176,6 +256,7 @@ Built on a feature branch. Development build on Minh's iPhone first, then an EAS
 
 - Both web workflows are green and stylify.space behaves as it does today.
 - The middleware tests pass.
+- A bearer request gets 503, not 401, when Kinde's key set cannot be reached.
 - A TestFlight build lets Minh sign in, see the same wardrobe as on the web, and add, edit and delete an item with a photo from the camera.
 - The docs above are written and match the repo.
 
@@ -219,13 +300,18 @@ Resolved on 2026-10-05:
 - Kinde access tokens: `iss` is `https://<subdomain>.kinde.com` with no trailing slash, `aud` is an array, `sub` is the user ID, and there is no email or name. JWKS is at `https://<subdomain>.kinde.com/.well-known/jwks`.
 - Current Expo template: SDK 57, React 19.2, React Native 0.86, source under `src/app`. `@kinde/expo` 0.9.0 supports Expo 56 and 57.
 
-Still open, for plan 2:
+Resolved on 2026-10-06, for plan 2:
 
-- That `sub` in a mobile access token equals the `user.id` the cookie path produces for the same person. This needs a real mobile token.
-- How `@kinde/expo` requests an audience (its README does not document it). Fallback: `expo-auth-session` directly, which Kinde's SDK is built on.
-- Whether `react-native-executorch` supports Expo SDK 57; if not, the app starts on the newest SDK it does support.
-- NativeWind's version for the chosen SDK.
-- Whether an unreachable Kinde key set should return 503 instead of 401. Today every bearer failure is 401, and the mobile rule is "401: refresh once, else sign out", so a Kinde outage would sign mobile users out. Decide before the app depends on it.
-- Install with `--filter` in both deploy workflows once `mobile` joins the workspace, so web deploys do not install React Native; add `mobile` build directories to `.dockerignore`.
-- Before plan 2: repair the frontend typecheck (`frontend/src/lib/api.ts:132` plus the 15 type errors behind it) and add it to the frontend workflow, since `mobile/` will share the `ApiRoutes` type and copy `api.ts` patterns.
-- Xcode is not installed on Minh's Mac (command-line tools only), so device builds go through EAS Build in the cloud unless Xcode is installed.
+- `@kinde/expo` 0.9.0 accepts `login({ audience })` in its types. Whether the issued token carries the audience is checked on a device in Part 3.
+- `react-native-executorch` 0.10.4 supports Expo SDK 55 and later, so the app starts on SDK 57.
+- Styling: NativeWind 4.2.7, proven in the scaffold task, with `StyleSheet` as the fallback.
+- An unreachable key set returns 503, not 401.
+- Both deploy workflows install with `--filter`, and `.dockerignore` gains the mobile build directories, in the scaffold task.
+- The frontend typecheck is repaired and runs in CI.
+- Minh installs Xcode; EAS Build is used only for TestFlight.
+
+Still open, checked during plan 2 with a real token:
+
+- That `sub` in a mobile access token equals the `user.id` the cookie path produces for the same person.
+- That the access token's `aud` contains `https://stylify.space/api`.
+- That NativeWind 4.2.7 renders on Expo SDK 57.
