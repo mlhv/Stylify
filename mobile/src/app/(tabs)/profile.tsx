@@ -1,15 +1,56 @@
 import { useKindeAuth } from '@kinde/expo'
 import { useQuery } from '@tanstack/react-query'
 import { Image } from 'expo-image'
+import { useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 
+import { ErrorState } from '@/components/ErrorState'
 import { getTotalClothesQueryOptions } from '@/lib/api'
 
 export default function Profile() {
   const kinde = useKindeAuth()
   // The bearer token carries only the user ID, so the profile comes from the SDK.
-  const profile = useQuery({ queryKey: ['kinde-profile'], queryFn: () => kinde.getUserProfile(), staleTime: Infinity })
+  const profile = useQuery({
+    queryKey: ['kinde-profile'],
+    // A null profile is a failure, so it is retried instead of cached for good.
+    queryFn: async () => {
+      const result = await kinde.getUserProfile()
+      if (!result) throw new Error('Could not load your profile')
+      return result
+    },
+    staleTime: Infinity,
+  })
   const total = useQuery(getTotalClothesQueryOptions)
+
+  const [signingOut, setSigningOut] = useState(false)
+
+  async function signOut() {
+    setSigningOut(true)
+    try {
+      await kinde.logout({ revokeToken: true })
+    } finally {
+      setSigningOut(false)
+    }
+  }
+
+  const signOutButton = (
+    <Pressable
+      className="mt-6 w-full items-center rounded-lg bg-neutral-900 py-4 disabled:opacity-50"
+      disabled={signingOut}
+      onPress={() => void signOut()}
+    >
+      <Text className="font-semibold text-white">Sign out</Text>
+    </Pressable>
+  )
+
+  if (profile.isError && !profile.data) {
+    return (
+      <View className="flex-1 bg-white p-6">
+        <ErrorState error={profile.error} onRetry={() => void profile.refetch()} />
+        {signOutButton}
+      </View>
+    )
+  }
 
   const user = profile.data
   const name = [user?.givenName, user?.familyName].filter(Boolean).join(' ')
@@ -26,9 +67,7 @@ export default function Profile() {
       <Text className="text-neutral-600">
         {total.data ? `${total.data.total} ${total.data.total === 1 ? 'item' : 'items'}` : total.isError ? 'Item count unavailable' : ' '}
       </Text>
-      <Pressable className="mt-6 w-full items-center rounded-lg bg-neutral-900 py-4" onPress={() => void kinde.logout({ revokeToken: true })}>
-        <Text className="font-semibold text-white">Sign out</Text>
-      </Pressable>
+      {signOutButton}
     </View>
   )
 }
