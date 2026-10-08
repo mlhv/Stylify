@@ -8,12 +8,20 @@ export function errorMessage(error: unknown): string {
   return 'Something went wrong'
 }
 
-export function ErrorState({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+export function ErrorState({
+  error,
+  onRetry,
+  retryLabel = 'Try again',
+}: {
+  error: unknown
+  onRetry: () => void
+  retryLabel?: string
+}) {
   return (
     <View className="flex-1 items-center justify-center gap-4 p-6">
       <Text className="text-center text-base text-neutral-700">{errorMessage(error)}</Text>
       <Pressable className="rounded-lg bg-neutral-900 px-5 py-3" onPress={onRetry}>
-        <Text className="font-semibold text-white">Try again</Text>
+        <Text className="font-semibold text-white">{retryLabel}</Text>
       </Pressable>
     </View>
   )

@@ -62,8 +62,16 @@ export async function getCurrentUser() {
   return res.json()
 }
 
+export class ItemNotFoundError extends Error {
+  constructor() {
+    super('This item no longer exists')
+    this.name = 'ItemNotFoundError'
+  }
+}
+
 export async function getItem({ id }: { id: number }) {
   const res = await api.wardrobe[':id{[0-9]+}'].$get({ param: { id: id.toString() } })
+  if (res.status === 404) throw new ItemNotFoundError()
   if (!res.ok) throw new Error('Could not load this item')
   return (await res.json()) as { item: Item }
 }

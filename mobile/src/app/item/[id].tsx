@@ -1,6 +1,6 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native'
 
 import { ErrorState, errorMessage } from '@/components/ErrorState'
@@ -11,8 +11,19 @@ import {
   getAllItemsQueryOptions,
   getItemQueryOptions,
   getTotalClothesQueryOptions,
+  ItemNotFoundError,
 } from '@/lib/api'
 import { uploadImage } from '@/lib/upload'
+
+// Drops an item from the cached list and count, as a successful delete does.
+function dropFromCaches(queryClient: QueryClient, id: number) {
+  queryClient.setQueryData(getAllItemsQueryOptions.queryKey, (old) =>
+    old ? { ...old, items: old.items.filter((existing) => existing.id !== id) } : old,
+  )
+  queryClient.setQueryData(getTotalClothesQueryOptions.queryKey, (old) =>
+    old ? { ...old, total: Math.max(0, old.total - 1) } : old,
+  )
+}
 
 export default function EditItem() {
   const params = useLocalSearchParams<{ id: string }>()
@@ -20,11 +31,25 @@ export default function EditItem() {
   const queryClient = useQueryClient()
   const router = useRouter()
   const [deleting, setDeleting] = useState(false)
-  const { data, error, isPending, refetch } = useQuery({ ...getItemQueryOptions(id), enabled: Number.isInteger(id) })
+  // Always ask the server on open: the item may have been deleted elsewhere since it was cached.
+  const { data, error, isPending, refetch } = useQuery({
+    ...getItemQueryOptions(id),
+    enabled: Number.isInteger(id),
+    refetchOnMount: 'always',
+  })
+  const dropped = useRef(false)
+  const gone = error instanceof ItemNotFoundError
+
+  useEffect(() => {
+    if (!gone || dropped.current) return
+    dropped.current = true
+    dropFromCaches(queryClient, id)
+  }, [gone, id, queryClient])
 
   if (!Number.isInteger(id)) return <ErrorState error={new Error('This item does not exist')} onRetry={() => router.back()} />
+  if (gone) return <ErrorState error={error} retryLabel="Back to wardrobe" onRetry={() => router.back()} />
   if (isPending) return <ActivityIndicator className="flex-1" />
-  if (error) return <ErrorState error={error} onRetry={() => void refetch()} />
+  if (error && !data) return <ErrorState error={error} onRetry={() => void refetch()} />
 
   const item = data.item
 
@@ -42,12 +67,7 @@ export default function EditItem() {
     setDeleting(true)
     try {
       await deleteItem({ id })
-      queryClient.setQueryData(getAllItemsQueryOptions.queryKey, (old) =>
-        old ? { ...old, items: old.items.filter((existing) => existing.id !== id) } : old,
-      )
-      queryClient.setQueryData(getTotalClothesQueryOptions.queryKey, (old) =>
-        old ? { ...old, total: Math.max(0, old.total - 1) } : old,
-      )
+      dropFromCaches(queryClient, id)
       queryClient.removeQueries({ queryKey: getItemQueryOptions(id).queryKey })
       router.back()
     } catch (e) {

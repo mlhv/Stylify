@@ -5,15 +5,19 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 
 import { AuthBridge } from '@/components/AuthBridge'
+import { ItemNotFoundError } from '@/lib/api'
 import { ServerUnreachableError, SignedOutError } from '@/lib/authFetch'
 import { KINDE_CLIENT_ID, KINDE_DOMAIN } from '@/lib/config'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // Retrying cannot fix a signed-out session, and "unreachable" gets its own retry button.
+      // Retrying cannot fix a signed-out session or a deleted item, and "unreachable" gets its own retry button.
       retry: (failures, error) =>
-        !(error instanceof SignedOutError) && !(error instanceof ServerUnreachableError) && failures < 2,
+        !(error instanceof SignedOutError) &&
+        !(error instanceof ServerUnreachableError) &&
+        !(error instanceof ItemNotFoundError) &&
+        failures < 2,
     },
   },
 })
