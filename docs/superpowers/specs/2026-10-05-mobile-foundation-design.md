@@ -244,7 +244,7 @@ Local development uses the production database and image bucket, so every test i
 8. Device checklist on the iPhone.
 9. Apple enrolment, EAS Build, TestFlight.
 
-> **2026-10-08:** Step 9 was dropped: TestFlight gave way to installing from Xcode onto the owner's iPhone (see `docs/mobile.md`).
+   > **2026-10-08:** Step 9 was dropped: TestFlight gave way to installing from Xcode onto the owner's iPhone (see `docs/mobile.md`).
 10. `docs/mobile.md` and the `AGENTS.md` update.
 
 Steps 1 and 2 are pushed to `main` with Minh's agreement. Steps 3 to 10 are built on a feature branch; nothing in `mobile/` triggers a deploy.
@@ -322,5 +322,6 @@ Resolved on 2026-10-06, for plan 2:
 Checked during plan 2 with a real token (all answered yes, 2026-10-08):
 
 - `sub` in a mobile access token equals the `user.id` the cookie path produces for the same person: yes, the user ID equals the token's `sub` and equals the web user ID.
-- The access token's `aud` contains `https://stylify.space/api`: yes. `/api/me` returns 200 with the bearer token.
+- The access token's `aud` contains `https://stylify.space/api`: yes.
+- `GET /api/me` with the bearer token returns the same user ID the web app gets: yes, 200.
 - NativeWind 4.2.7 renders on Expo SDK 55: yes, in the iPhone 17 simulator.

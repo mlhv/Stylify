@@ -1,3 +1,5 @@
+Superseded on 2026-10-08: Tasks 8 and 10 are done, Task 9 (TestFlight) was dropped, and Xcode 26.3 does install to iOS 27. See `docs/mobile.md`.
+
 # Handoff: Expo mobile app, after Tasks 1–7
 
 Date: 2026-10-08
