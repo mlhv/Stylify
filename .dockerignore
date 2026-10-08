@@ -7,3 +7,7 @@ drizzle
 README.md
 docs/
 models/
+mobile/.expo
+mobile/ios
+mobile/android
+mobile/dist

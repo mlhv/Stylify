@@ -2,7 +2,7 @@
   "name": "fashionapp",
   "module": "server/index.ts",
   "type": "module",
-  "workspaces": ["frontend", "server", "shared"],
+  "workspaces": ["frontend", "server", "shared", "mobile"],
   "overrides": {
     "react": "19.2.3",
     "react-dom": "19.2.3"

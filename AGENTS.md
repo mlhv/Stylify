@@ -1,6 +1,6 @@
 # Stylify
 
-A personal wardrobe app, live at https://stylify.space. Users sign in, upload photos of clothing, and manage their wardrobe. It is a portfolio project first and a daily-use app second. A native iPhone app (Expo, in `mobile/`) is planned; see `docs/superpowers/specs/` for the current design and roadmap.
+A personal wardrobe app, live at https://stylify.space. Users sign in, upload photos of clothing, and manage their wardrobe. It is a portfolio project first and a daily-use app second. A native iPhone app (Expo, in `mobile/`) is being built; see `docs/superpowers/specs/` for the current design and roadmap.
 
 ## Layout
 
@@ -8,11 +8,12 @@ A personal wardrobe app, live at https://stylify.space. Users sign in, upload ph
 server/     Hono API on Bun. Deployed as a Lambda container.
 frontend/   React 19 + Vite SPA. Deployed to S3 behind CloudFront.
 shared/     @stylify/shared: Zod schemas and types used by server and frontend.
+mobile/     Expo SDK 57 iPhone app. Not deployed by CI.
 drizzle/    SQL migrations (generated; do not hand-edit).
 docs/       Architecture docs. Read the relevant one before changing that area.
 ```
 
-`server`, `frontend` and `shared` are Bun workspaces with one lockfile at the root (`bun.lockb`).
+`server`, `frontend`, `shared` and `mobile` are Bun workspaces with one lockfile at the root (`bun.lockb`).
 
 | Path | What it is |
 |---|---|
@@ -51,6 +52,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **Typecheck the frontend yourself.** `vite build` does not typecheck; `bun run typecheck` in `frontend/` does, and the frontend deploy runs it before building, so a type error blocks the deploy. The frontend's `tsconfig` also checks the server files it imports types from, with `noUnusedLocals` on, so an unused variable in `server/` can fail the frontend typecheck.
 - **`@tanstack/react-form` and `@tanstack/zod-form-adapter` must be on the same minor version** (both 0.32 today). A mismatch still runs but breaks the form validator types.
 - **Routes that return `c.notFound()` lose their response type in the RPC client.** `frontend/src/lib/api.ts` asserts those results to the `Item` type; keep that in mind when changing what `GET`/`PUT /api/wardrobe/:id` return.
+- **Server and web installs need `--omit=peer` as well as `--filter`.** The server's Kinde SDK has an optional peer, `expo-secure-store`, which `mobile/` puts in the lockfile. Without `--omit=peer`, `--filter server` installs Expo and React Native (about 700 packages instead of about 100). The Dockerfile and both deploy workflows use it. After changing any of them, check `docker run --rm <image> sh -c 'ls node_modules | wc -l'` prints about 57.
 - **Never print or commit `.env` values.**
 
 ## Patterns
