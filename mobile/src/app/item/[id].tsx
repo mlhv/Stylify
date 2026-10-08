@@ -14,6 +14,7 @@ import {
   ItemNotFoundError,
   type Item,
 } from '@/lib/api'
+import { uploadUnlessDone, type UploadedPhoto } from '@/lib/reuseUpload'
 import { uploadImage } from '@/lib/upload'
 
 // Drops an item from the cached list and count, as a successful delete does.
@@ -40,6 +41,8 @@ export default function EditItem() {
   })
   const dropped = useRef(false)
   const [savedGone, setSavedGone] = useState(false)
+  // A new photo that reached S3 but whose save failed; reused on retry.
+  const [uploaded, setUploaded] = useState<UploadedPhoto | null>(null)
   const gone = savedGone || error instanceof ItemNotFoundError
 
   useEffect(() => {
@@ -56,7 +59,12 @@ export default function EditItem() {
   const item = data.item
 
   async function save(fields: ItemFields, photoUri: string | null) {
-    const imageUrl = photoUri ? await uploadImage(photoUri) : item.imageUrl
+    let imageUrl = item.imageUrl
+    if (photoUri) {
+      const photo = await uploadUnlessDone(uploaded, photoUri, uploadImage)
+      setUploaded(photo)
+      imageUrl = photo.url
+    }
     let updated: Item
     try {
       updated = await editItem({ id, value: { ...fields, imageUrl } })
