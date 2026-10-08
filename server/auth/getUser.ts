@@ -1,5 +1,6 @@
 import { type Context } from 'hono'
 import { createMiddleware } from 'hono/factory'
+import { BearerUnavailableError } from './bearer'
 
 // The cookie path supplies the full Kinde profile. The bearer path only has the
 // token's subject, so everything except id is optional.
@@ -22,6 +23,9 @@ export type GetUserDeps = {
   cookieAuth: (c: Context) => Promise<AuthUser | null>
 }
 
+// A bearer header that fails gets 401 when the token is bad and 503 when it
+// could not be checked; neither falls back to cookies.
+//
 // null: not a bearer header, use cookies. A string (possibly empty): a bearer
 // header, which must verify or the request is rejected.
 export function bearerToken(header: string | undefined): string | null {
@@ -40,6 +44,9 @@ export function createGetUser(deps: GetUserDeps) {
         c.set('user', await deps.verifyBearer(token))
       } catch (error) {
         console.error('Bearer auth failed:', error instanceof Error ? error.message : error)
+        if (error instanceof BearerUnavailableError) {
+          return c.json({ error: 'Auth unavailable' }, 503)
+        }
         return c.json({ error: 'Invalid token' }, 401)
       }
       return next()

@@ -30,9 +30,11 @@ describe('getUser wiring in kinde.ts', () => {
     expect(await res.json()).toEqual({ error: 'Not authenticated' })
   })
 
-  test('garbage bearer token: 401 Invalid token', async () => {
+  // KINDE_AUDIENCE is unset above: the server still boots and serves cookie
+  // requests, and a bearer request is "could not check", not "bad token".
+  test('bearer token while KINDE_AUDIENCE is unset: 503 Auth unavailable', async () => {
     const res = await app.request('/protected', { headers: { Authorization: 'Bearer garbage' } })
-    expect(res.status).toBe(401)
-    expect(await res.json()).toEqual({ error: 'Invalid token' })
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: 'Auth unavailable' })
   })
 })

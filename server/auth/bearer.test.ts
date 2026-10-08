@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from 'bun:test'
-import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose'
-import { BearerAuthError, createBearerVerifier, type KeyResolver } from './bearer'
+import { SignJWT, createLocalJWKSet, errors, exportJWK, generateKeyPair } from 'jose'
+import { BearerAuthError, BearerUnavailableError, createBearerVerifier, type KeyResolver } from './bearer'
 
 const ISSUER = 'https://example.kinde.com'
 const AUDIENCE = 'https://stylify.space/api'
@@ -126,21 +126,55 @@ describe('createBearerVerifier', () => {
     await expect(verifier()('')).rejects.toBeInstanceOf(BearerAuthError)
   })
 
-  test('rejects when audience is not configured', async () => {
+  test('is unavailable, not rejected, when audience is not configured', async () => {
     const verify = verifier({ audience: undefined })
-    await expect(verify(await makeToken())).rejects.toBeInstanceOf(BearerAuthError)
+    await expect(verify(await makeToken())).rejects.toBeInstanceOf(BearerUnavailableError)
   })
 
-  test('rejects when issuer or key set is not configured', async () => {
+  test('is unavailable when issuer or key set is not configured', async () => {
     const token = await makeToken()
-    await expect(verifier({ issuer: undefined })(token)).rejects.toBeInstanceOf(BearerAuthError)
-    await expect(verifier({ jwks: undefined })(token)).rejects.toBeInstanceOf(BearerAuthError)
+    await expect(verifier({ issuer: undefined })(token)).rejects.toBeInstanceOf(BearerUnavailableError)
+    await expect(verifier({ jwks: undefined })(token)).rejects.toBeInstanceOf(BearerUnavailableError)
   })
 
-  test('rejects when the key set cannot be loaded', async () => {
+  test('is unavailable when the key set cannot be fetched', async () => {
     const failing = (async () => {
-      throw new Error('network down')
+      throw new TypeError('fetch failed')
     }) as unknown as KeyResolver
-    await expect(verifier({ jwks: failing })(await makeToken())).rejects.toBeInstanceOf(BearerAuthError)
+    await expect(verifier({ jwks: failing })(await makeToken())).rejects.toBeInstanceOf(BearerUnavailableError)
+  })
+
+  test('is unavailable when the key set request times out or answers badly', async () => {
+    for (const error of [
+      new errors.JWKSTimeout(),
+      new errors.JOSEError('Expected 200 OK from the JSON Web Key Set HTTP response'),
+      new errors.JWKSInvalid('JSON Web Key Set malformed'),
+    ]) {
+      const failing = (async () => {
+        throw error
+      }) as unknown as KeyResolver
+      await expect(verifier({ jwks: failing })(await makeToken())).rejects.toBeInstanceOf(BearerUnavailableError)
+    }
+  })
+
+  test('a token signed by a key that is not in the key set is rejected, not unavailable', async () => {
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: 'RS256', kid: 'unknown-key' })
+      .setIssuer(ISSUER)
+      .setAudience([AUDIENCE])
+      .setSubject(SUBJECT)
+      .setExpirationTime(Math.floor(Date.now() / 1000) + 300)
+      .sign(otherKeys.privateKey)
+    const error = await verifier()(token).catch((e) => e)
+    expect(error).toBeInstanceOf(BearerAuthError)
+    expect(error).not.toBeInstanceOf(BearerUnavailableError)
+  })
+
+  test('a rejected token is never reported as unavailable', async () => {
+    for (const token of ['not-a-jwt', '', await makeToken({ expiresAt: Math.floor(Date.now() / 1000) - 60 })]) {
+      const error = await verifier()(token).catch((e) => e)
+      expect(error).toBeInstanceOf(BearerAuthError)
+      expect(error).not.toBeInstanceOf(BearerUnavailableError)
+    }
   })
 })

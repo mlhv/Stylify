@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from 'bun:test'
 import { Hono } from 'hono'
+import { BearerUnavailableError } from './bearer'
 import { bearerToken, createGetUser, type AuthUser, type GetUserDeps } from './getUser'
 
 const COOKIE_USER: AuthUser = { id: 'kp_cookie', given_name: 'Minh', family_name: 'Le', email: 'm@example.com', picture: null }
@@ -8,6 +9,7 @@ function setup(overrides: Partial<GetUserDeps> = {}) {
   const deps = {
     verifyBearer: mock(async (token: string): Promise<AuthUser> => {
       if (token === 'good') return { id: 'kp_bearer' }
+      if (token === 'outage') throw new BearerUnavailableError('key set unreachable')
       throw new Error('bad token')
     }),
     cookieAuth: mock(async (): Promise<AuthUser | null> => COOKIE_USER),
@@ -75,6 +77,14 @@ describe('createGetUser', () => {
     const res = await request({ Authorization: 'Bearer' })
     expect(res.status).toBe(401)
     expect(await res.json()).toEqual({ error: 'Invalid token' })
+    expect(deps.cookieAuth).not.toHaveBeenCalled()
+  })
+
+  test('bearer token that could not be checked: 503 and no fallback to cookies', async () => {
+    const { deps, request } = setup()
+    const res = await request({ Authorization: 'Bearer outage' })
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: 'Auth unavailable' })
     expect(deps.cookieAuth).not.toHaveBeenCalled()
   })
 
