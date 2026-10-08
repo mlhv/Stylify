@@ -2,7 +2,7 @@ import { createItemSchema } from '@stylify/shared'
 import { useForm } from '@tanstack/react-form'
 import { zodValidator } from '@tanstack/zod-form-adapter'
 import { Image } from 'expo-image'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { errorMessage } from '@/components/ErrorState'
@@ -15,6 +15,8 @@ type Props = {
   // The saved image when editing; undefined when adding.
   currentImageUrl?: string
   submitLabel: string
+  // Extra controls (such as Delete) shown inside the scroll view, so the keyboard cannot hide them.
+  footer?: ReactNode
   // newPhotoUri is a local JPEG the user just chose, or null to keep currentImageUrl.
   onSubmit: (fields: ItemFields, newPhotoUri: string | null) => Promise<void>
 }
@@ -27,7 +29,7 @@ const FIELDS = [
   { name: 'color', label: 'Colour' },
 ] as const
 
-export function ItemForm({ initial, currentImageUrl, submitLabel, onSubmit }: Props) {
+export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubmit }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const shownImage = photoUri ?? currentImageUrl
@@ -63,7 +65,12 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, onSubmit }: Pr
   }
 
   return (
-    <ScrollView className="flex-1 bg-white" contentContainerClassName="gap-4 p-4" keyboardShouldPersistTaps="handled">
+    <ScrollView
+      className="flex-1 bg-white"
+      contentContainerClassName="gap-4 p-4"
+      automaticallyAdjustKeyboardInsets
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag">
       {shownImage ? (
         <Image source={{ uri: shownImage }} style={{ width: '100%', aspectRatio: 1, borderRadius: 12 }} contentFit="cover" />
       ) : (
@@ -113,6 +120,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, onSubmit }: Pr
           </Pressable>
         )}
       </form.Subscribe>
+      {footer}
     </ScrollView>
   )
 }

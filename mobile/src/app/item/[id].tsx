@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, Text } from 'react-native'
 
 import { ErrorState, errorMessage } from '@/components/ErrorState'
 import { ItemForm, type ItemFields } from '@/components/ItemForm'
@@ -104,16 +104,16 @@ export default function EditItem() {
   }
 
   return (
-    <View className="flex-1 bg-white">
-      <ItemForm
-        initial={{ name: item.name ?? '', type: item.type ?? '', size: item.size ?? '', color: item.color ?? '' }}
-        currentImageUrl={item.imageUrl}
-        submitLabel="Save changes"
-        onSubmit={save}
-      />
-      <Pressable className="m-4 items-center rounded-lg border border-red-600 py-4" disabled={deleting} onPress={confirmDelete}>
-        {deleting ? <ActivityIndicator /> : <Text className="font-semibold text-red-600">Delete item</Text>}
-      </Pressable>
-    </View>
+    <ItemForm
+      initial={{ name: item.name ?? '', type: item.type ?? '', size: item.size ?? '', color: item.color ?? '' }}
+      currentImageUrl={item.imageUrl}
+      submitLabel="Save changes"
+      onSubmit={save}
+      footer={
+        <Pressable className="items-center rounded-lg border border-red-600 py-4" disabled={deleting} onPress={confirmDelete}>
+          {deleting ? <ActivityIndicator /> : <Text className="font-semibold text-red-600">Delete item</Text>}
+        </Pressable>
+      }
+    />
   )
 }
