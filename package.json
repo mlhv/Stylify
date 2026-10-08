@@ -4,8 +4,8 @@
   "type": "module",
   "workspaces": ["frontend", "server", "shared", "mobile"],
   "overrides": {
-    "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react": "19.2.0",
+    "react-dom": "19.2.0"
   },
   "scripts": {
     "start": "bun server/index.ts",

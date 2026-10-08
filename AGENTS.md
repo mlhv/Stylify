@@ -8,7 +8,7 @@ A personal wardrobe app, live at https://stylify.space. Users sign in, upload ph
 server/     Hono API on Bun. Deployed as a Lambda container.
 frontend/   React 19 + Vite SPA. Deployed to S3 behind CloudFront.
 shared/     @stylify/shared: Zod schemas and types used by server and frontend.
-mobile/     Expo SDK 57 iPhone app. Not deployed by CI.
+mobile/     Expo SDK 55 iPhone app. Not deployed by CI.
 drizzle/    SQL migrations (generated; do not hand-edit).
 docs/       Architecture docs. Read the relevant one before changing that area.
 ```
@@ -30,7 +30,7 @@ docs/       Architecture docs. Read the relevant one before changing that area.
 
 Bun is pinned to 1.3.13 locally, in CI and in the Dockerfile.
 
-Xcode on the owner's Mac is 26.3 with the iOS 26.3.1 simulator runtime. The Mac runs macOS Sequoia, and these are the newest versions it supports, so do not suggest a newer Xcode or simulator; if a tool requires one, say so and stop.
+Xcode on the owner's Mac is 26.3 with the iOS 26.3.1 simulator runtime. The Mac runs macOS Sequoia, and these are the newest versions it supports, so do not suggest a newer Xcode or simulator; if a tool requires one, say so and stop. This is why the app is on Expo SDK 55: SDK 56 and later need Swift 6.3 (Xcode 26.4+) and fail to compile `expo-modules-jsi` on Xcode 26.3. Upgrading the Expo SDK needs a macOS and Xcode upgrade first.
 
 ```bash
 bun install                      # all workspaces, from the root

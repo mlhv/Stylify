@@ -37,10 +37,10 @@ Out of scope (each gets its own spec later):
 | Decision | Choice | Reason |
 |---|---|---|
 | Web vs mobile | Add mobile; keep the web app | The web app is built, costs about $0.15/month, and is the only thing openable from a link |
-| Framework | Expo SDK 57, development builds, iOS 17+ | The current template; `react-native-executorch` 0.10.4 (planned for the classifier) requires SDK 55+, a development build, the New Architecture and iOS 17+ |
+| Framework | Expo SDK 55, development builds, iOS 17+ | The newest SDK that builds on Xcode 26.3 (SDK 56+ needs Xcode 26.4+); `react-native-executorch` 0.10.4 (planned for the classifier) requires SDK 55+, a development build, the New Architecture and iOS 17+ |
 | Platform | iPhone only | One platform to test and one store review; avoid iOS-only libraries so Android stays possible |
 | Routing | Expo Router | File-based, similar to TanStack Router |
-| Styling | NativeWind 4.2.7 (Tailwind 3); `StyleSheet` if it fails on SDK 57 | Reuses Tailwind knowledge on the stable release, with the same Tailwind major as the web app |
+| Styling | NativeWind 4.2.7 (Tailwind 3); `StyleSheet` if it fails on SDK 55 | Reuses Tailwind knowledge on the stable release, with the same Tailwind major as the web app |
 | Server state | TanStack Query | Same as web |
 | Forms | TanStack Form + `createItemSchema` from `@stylify/shared` | Same validation as web and server |
 | API client | Hono RPC client (`hc<ApiRoutes>`) | Keeps calls typed end to end |
@@ -60,7 +60,7 @@ mobile/     new Expo app (new workspace)
 
 `mobile` is a member of the root Bun `workspaces`, sharing the root lockfile. Tested in a throwaway copy on 2026-10-05; three things make that safe:
 
-- **One React.** The web app moves to React 19.2.3, the exact version Expo SDK 57 uses, and the root `package.json` forces it with `overrides`. Without the override, Bun nests React 18 under two web libraries whose peer ranges stop at 18. From then on the web app's React version follows the Expo SDK's.
+- **One React.** The web app moves to React 19.2.0 (first 19.2.3, until 2026-10-08), the exact version Expo SDK 55 uses, and the root `package.json` forces it with `overrides`. Without the override, Bun nests React 18 under two web libraries whose peer ranges stop at 18. From then on the web app's React version follows the Expo SDK's.
 - **The backend image.** The Dockerfile copies every workspace manifest, including `mobile/package.json`, and installs with `--filter server --omit=peer`, which keeps React Native out of the image (see Part 3, "Workspace and CI second").
 - **Deploy triggers.** `bun.lockb` is not a trigger for either workflow, so mobile dependency changes do not redeploy the web app or the API.
 
@@ -127,11 +127,13 @@ The live web app is the regression check for the cookie path after deploy.
 
 Revised 2026-10-06 after plan 1 shipped. The facts marked "verified" come from a throwaway copy of the repo on 2026-10-05; nothing has yet run on a device or simulator.
 
+**Revised 2026-10-08: the app is on Expo SDK 55, not 57.** Xcode 26.3 (Swift 6.2.4, the newest for macOS Sequoia) cannot compile `expo-modules-jsi`, which SDK 56 and 57 depend on (expo/expo issues #49941 and #50067; they need Swift 6.3, Xcode 26.4+). SDK 55 has no `expo-modules-jsi`, and the app built and ran in the iPhone 17 simulator. Minh chose to stay on Sequoia, use SDK 55 and keep `@kinde/expo` at 0.9.0 (its peer range names Expo 56 and 57, so Bun prints peer warnings; accepted). Upgrading the SDK needs a macOS and Xcode upgrade first. Where this spec still says SDK 57, 19.2.3 or React Native 0.86, read SDK 55, 19.2.0 and 0.83.
+
 ### Project shape
 
-- Created with `bunx create-expo-app@latest mobile --template default`: Expo SDK 57, React 19.2.3, React Native 0.86.3, source under `mobile/src/`. Delete the `mobile/.git` the template creates.
+- Created with `bunx create-expo-app@latest mobile --template default@sdk-55`: Expo SDK 55, React 19.2.0, React Native 0.83.x, source under `mobile/src/`. Delete the `mobile/.git` the template creates.
 - `scheme`: `stylify`. Bundle identifier: `space.stylify.app`. Minimum iOS: 17. New Architecture on. Development builds only; Expo Go is not used. These match what `react-native-executorch` needs for the classifier spec.
-- React stays at 19.2.3, so the pin in `frontend/package.json` and the root `overrides` does not change.
+- React moves to 19.2.0 (what SDK 55 requires), so the pin in `frontend/package.json` and the root `overrides` changes from 19.2.3 to 19.2.0.
 - `mobile/tsconfig.json` adds `"@server/*": ["../server/*"]` to `paths`, and `mobile` depends on `hono` and `@stylify/shared` (verified: typechecks and bundles with no Metro changes).
 
 ### Backend change first: 503 for "could not verify"
@@ -309,9 +311,10 @@ Resolved on 2026-10-06, for plan 2:
 - Both deploy workflows install with `--filter`, and `.dockerignore` gains the mobile build directories, in the scaffold task.
 - The frontend typecheck is repaired and runs in CI.
 - Minh installs Xcode; EAS Build is used only for TestFlight.
+- 2026-10-08: the app moved to Expo SDK 55 because SDK 56 and 57 do not compile on Xcode 26.3 (see the note at the top of Part 3).
 
 Still open, checked during plan 2 with a real token:
 
 - That `sub` in a mobile access token equals the `user.id` the cookie path produces for the same person.
 - That the access token's `aud` contains `https://stylify.space/api`.
-- That NativeWind 4.2.7 renders on Expo SDK 57.
+- That NativeWind 4.2.7 renders on Expo SDK 55. (Done 2026-10-08: it renders in the iPhone 17 simulator.)

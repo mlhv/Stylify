@@ -4,11 +4,13 @@
 
 **Goal:** Ship a native iPhone app for Stylify, at parity with the web app (sign in, wardrobe grid, add with a photo, edit, delete, profile), as a TestFlight build that uses the same API, database and Kinde users.
 
-**Architecture:** `mobile/` is a fourth Bun workspace created from the Expo SDK 57 template. It calls the existing Hono API through the typed RPC client (`hc<ApiRoutes>`) with a small fetch wrapper that attaches a Kinde access token and applies the 401/503 rules. Auth comes from `@kinde/expo`; because its functions only exist inside React, a tiny `AuthBridge` component hands them to the module-level API client. Before the app exists, the API learns to answer 503 instead of 401 when it could not check a token.
+**Architecture:** `mobile/` is a fourth Bun workspace created from the Expo SDK 55 template. It calls the existing Hono API through the typed RPC client (`hc<ApiRoutes>`) with a small fetch wrapper that attaches a Kinde access token and applies the 401/503 rules. Auth comes from `@kinde/expo`; because its functions only exist inside React, a tiny `AuthBridge` component hands them to the module-level API client. Before the app exists, the API learns to answer 503 instead of 401 when it could not check a token.
 
-**Tech Stack:** Expo SDK 57 (React Native 0.86.3, React 19.2.3), Expo Router, TanStack Query 5, TanStack Form 0.32 with `createItemSchema`, Hono RPC client, `@kinde/expo` 0.9.0, NativeWind 4.2.7 (Tailwind 3), `expo-image-picker`, `expo-image-manipulator`, `expo-file-system`, `bun test`, EAS Build.
+**Tech Stack:** Expo SDK 55 (React Native 0.83.x, React 19.2.0), Expo Router, TanStack Query 5, TanStack Form 0.32 with `createItemSchema`, Hono RPC client, `@kinde/expo` 0.9.0, NativeWind 4.2.7 (Tailwind 3), `expo-image-picker`, `expo-image-manipulator`, `expo-file-system`, `bun test`, EAS Build.
 
 **Spec:** `docs/superpowers/specs/2026-10-05-mobile-foundation-design.md` (Part 3 and `docs/mobile.md` from Part 4). Read it before starting; this plan argues from it.
+
+> **2026-10-08:** This plan now targets Expo SDK 55 (React 19.2.0, React Native 0.83.x), because SDK 56 and 57 do not compile on Xcode 26.3. Every snippet below was typechecked against SDK 57 only: re-typecheck each task and apply "the SDK wins" against `https://docs.expo.dev/versions/v55.0.0/`. Task 2 was redone as "Task 2b" (see `.superpowers/sdd/2026-10-06-expo-mobile-app/task-2b-brief.md`); its bodies below are the SDK 57 originals.
 
 ## How this plan was checked
 
@@ -33,7 +35,7 @@ What it did not prove: anything at runtime on a simulator or iPhone. Sign-in, Na
 - **Ask Minh before every push to `main`.** A push that touches `server/`, `shared/`, `frontend/` or the root `package.json` deploys the live site. Work on a branch; reach `main` only with `git merge --ff-only`. Never force-push `main`.
 - Rollback for a bad deploy: `git revert --no-edit <bad commits>` on `main`, then push (after telling Minh).
 - Bun is `1.3.13` everywhere. Check `bun --version` first; stop if it differs.
-- Expo SDK 57. React and `react-dom` stay exactly `19.2.3`; do not change the pin in `frontend/package.json` or root `overrides`. After any install, `find node_modules -path '*node_modules/react/package.json'` must print one line.
+- Expo SDK 55. React and `react-dom` stay exactly `19.2.0`; do not change the pin in `frontend/package.json` or root `overrides`. After any install, `find node_modules -path '*node_modules/react/package.json'` must print one line.
 - App identity: `scheme` `stylify`, bundle identifier `space.stylify.app`, iOS deployment target `17.0`. Development builds only; Expo Go is not used. Do not turn the New Architecture off.
 - iPhone only, but do not add iOS-only libraries.
 - Kinde audience: `https://stylify.space/api`. It must equal `KINDE_AUDIENCE` on the server.
@@ -42,7 +44,7 @@ What it did not prove: anything at runtime on a simulator or iPhone. Sign-in, Na
 - Call the API only through the typed client in `mobile/src/lib/api.ts`. The one exception is the temporary screen in Task 3, deleted in Task 4.
 - Install Expo packages with `bunx expo install <package>` from `mobile/`, never `bun add`, so versions match the SDK. Other packages: `bun add` from `mobile/`. After any `package.json` change run `bun install` at the repo root and commit `bun.lockb`.
 - `@tanstack/react-form` and `@tanstack/zod-form-adapter` stay on the same minor (0.32) as the web app.
-- Expo APIs change every SDK. Before changing any Expo code in this plan, read the versioned page under `https://docs.expo.dev/versions/v57.0.0/`. If the SDK disagrees with a snippet here, the SDK wins: make the smallest change that typechecks, and note it in the commit message.
+- Expo APIs change every SDK. Before changing any Expo code in this plan, read the versioned page under `https://docs.expo.dev/versions/v55.0.0/`. If the SDK disagrees with a snippet here, the SDK wins: make the smallest change that typechecks, and note it in the commit message.
 - `mobile/ios` and `mobile/android` are generated and ignored by git. Never edit them by hand; change `app.json`.
 - Never print or commit `.env` values. `mobile/.env.local` is ignored by git. Kinde's domain and client ID are not secrets (they ship in the app), but keep them out of the repo anyway.
 - Local development uses the production database and image bucket. Delete every test item afterwards.
