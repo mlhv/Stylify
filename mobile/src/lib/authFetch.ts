@@ -27,6 +27,8 @@ const UNREACHABLE = new Set([502, 503, 504])
 
 export function createAuthFetch(deps: AuthFetchDeps) {
   let refreshing: Promise<boolean> | null = null
+  // Requests that share a refresh share its sign-out, so one ended session opens one logout.
+  const signOuts = new WeakMap<Promise<boolean>, Promise<void>>()
 
   // Requests that fail together share one refresh.
   function refreshOnce() {
@@ -49,8 +51,13 @@ export function createAuthFetch(deps: AuthFetchDeps) {
     return res
   }
 
-  async function signOut(): Promise<never> {
-    await deps.onSignedOut()
+  async function signOut(round: Promise<boolean>): Promise<never> {
+    let done = signOuts.get(round)
+    if (!done) {
+      done = Promise.resolve(deps.onSignedOut())
+      signOuts.set(round, done)
+    }
+    await done
     throw new SignedOutError()
   }
 
@@ -61,18 +68,19 @@ export function createAuthFetch(deps: AuthFetchDeps) {
       if (res.status !== 401) return res
     }
 
+    const round = refreshOnce()
     let refreshed: boolean
     try {
-      refreshed = await refreshOnce()
+      refreshed = await round
     } catch {
       throw new ServerUnreachableError()
     }
-    if (!refreshed) return signOut()
+    if (!refreshed) return signOut(round)
 
     const fresh = await deps.getAccessToken()
-    if (!fresh) return signOut()
+    if (!fresh) return signOut(round)
     const retry = await send(input, init, fresh)
-    if (retry.status === 401) return signOut()
+    if (retry.status === 401) return signOut(round)
     return retry
   }
 }

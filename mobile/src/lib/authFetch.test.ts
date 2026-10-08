@@ -120,4 +120,22 @@ describe('createAuthFetch', () => {
     expect([a.status, b.status]).toEqual([200, 200])
     expect(deps.refresh).toHaveBeenCalledTimes(1)
   })
+
+  test('concurrent 401s with a refused refresh sign out once and each still fails', async () => {
+    const { authFetch, deps } = setup([401, 401, 401], { refresh: mock(async () => false) })
+    const results = await Promise.allSettled([authFetch(URL), authFetch(URL), authFetch(URL)])
+    for (const r of results) {
+      expect(r.status).toBe('rejected')
+      expect((r as PromiseRejectedResult).reason).toBeInstanceOf(SignedOutError)
+    }
+    expect(deps.refresh).toHaveBeenCalledTimes(1)
+    expect(deps.onSignedOut).toHaveBeenCalledTimes(1)
+  })
+
+  test('a second session that ends signs out again', async () => {
+    const { authFetch, deps } = setup([401, 401], { refresh: mock(async () => false) })
+    await expect(authFetch(URL)).rejects.toBeInstanceOf(SignedOutError)
+    await expect(authFetch(URL)).rejects.toBeInstanceOf(SignedOutError)
+    expect(deps.onSignedOut).toHaveBeenCalledTimes(2)
+  })
 })
