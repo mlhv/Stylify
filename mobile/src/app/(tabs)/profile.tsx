@@ -2,11 +2,12 @@ import { useKindeAuth } from '@kinde/expo'
 import { useQuery } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { useState } from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Alert, Pressable, Text, View } from 'react-native'
 
-import { ErrorState } from '@/components/ErrorState'
+import { ErrorState, errorMessage } from '@/components/ErrorState'
 import { getTotalClothesQueryOptions } from '@/lib/api'
 import { endSession } from '@/lib/endSession'
+import { kindeSessionEnd } from '@/lib/kindeSession'
 
 export default function Profile() {
   const kinde = useKindeAuth()
@@ -28,7 +29,9 @@ export default function Profile() {
   async function signOut() {
     setSigningOut(true)
     try {
-      await endSession(kinde.logout, { revokeToken: true })
+      await endSession(kindeSessionEnd)
+    } catch (e) {
+      Alert.alert('Could not sign out', errorMessage(e))
     } finally {
       setSigningOut(false)
     }

@@ -3,10 +3,12 @@ import '../../global.css'
 import { KindeAuthProvider, useKindeAuth } from '@kinde/expo'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
+import { useSyncExternalStore } from 'react'
 
 import { AuthBridge } from '@/components/AuthBridge'
 import { ItemNotFoundError } from '@/lib/api'
 import { ServerUnreachableError, SignedOutError } from '@/lib/authFetch'
+import { authResetEpoch, subscribeAuthReset } from '@/lib/authReset'
 import { KINDE_CLIENT_ID, KINDE_DOMAIN } from '@/lib/config'
 
 const queryClient = new QueryClient({
@@ -40,8 +42,10 @@ function RootStack() {
 }
 
 export default function RootLayout() {
+  // Signing out bumps this, which remounts the provider so it forgets the session.
+  const epoch = useSyncExternalStore(subscribeAuthReset, authResetEpoch)
   return (
-    <KindeAuthProvider config={{ domain: KINDE_DOMAIN, clientId: KINDE_CLIENT_ID }}>
+    <KindeAuthProvider key={epoch} config={{ domain: KINDE_DOMAIN, clientId: KINDE_CLIENT_ID }}>
       <QueryClientProvider client={queryClient}>
         <AuthBridge />
         <RootStack />
