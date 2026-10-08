@@ -1,6 +1,6 @@
 # Stylify
 
-A personal wardrobe app, live at https://stylify.space. Users sign in, upload photos of clothing, and manage their wardrobe. It is a portfolio project first and a daily-use app second. A native iPhone app (Expo, in `mobile/`) is being built; see `docs/superpowers/specs/` for the current design and roadmap.
+A personal wardrobe app, live at https://stylify.space. Users sign in, upload photos of clothing, and manage their wardrobe. It is a portfolio project first and a daily-use app second. The iPhone app (Expo, in `mobile/`) is installed on the owner's phone from Xcode, not on TestFlight or the App Store; see `docs/mobile.md`, and `docs/superpowers/specs/` for the roadmap.
 
 ## Layout
 
@@ -24,16 +24,16 @@ docs/       Architecture docs. Read the relevant one before changing that area.
 | `server/db/schema/items.ts` | The only table |
 | `shared/src/index.ts` | `createItemSchema`, `OutfitSuggestion` |
 | `frontend/src/lib/api.ts` | Typed Hono client and every `queryOptions` |
+| `frontend/src/routes/` | TanStack Router file routes; `_authenticated.tsx` is the auth guard |
 | `mobile/src/lib/api.ts` | Typed Hono client and `queryOptions` for the app |
 | `mobile/src/lib/authFetch.ts` | 401/503 rules, with tests |
 | `mobile/src/app/` | Expo Router routes; `_layout.tsx` is the auth guard |
-| `frontend/src/routes/` | TanStack Router file routes; `_authenticated.tsx` is the auth guard |
 
 ## Commands
 
 Bun is pinned to 1.3.13 locally, in CI and in the Dockerfile.
 
-Xcode on the owner's Mac is 26.3 with the iOS 26.3.1 simulator runtime. The Mac runs macOS Sequoia, and these are the newest versions it supports, so do not suggest a newer Xcode or simulator; if a tool requires one, say so and stop. This is why the app is on Expo SDK 55: SDK 56 and later need Swift 6.3 (Xcode 26.4+) and fail to compile `expo-modules-jsi` on Xcode 26.3. Upgrading the Expo SDK needs a macOS and Xcode upgrade first.
+Xcode on the owner's Mac is 26.3 with the iOS 26.3.1 simulator runtime. The Mac runs macOS Sequoia, and these are the newest versions it supports, so do not suggest a newer Xcode or simulator; if a tool requires one, say so and stop. This is why the app is on Expo SDK 55: SDK 56 and later need Swift 6.3 (Xcode 26.4+) and fail to compile `expo-modules-jsi` on Xcode 26.3. Upgrading the Expo SDK needs a macOS and Xcode upgrade first. Xcode 26.3 does install to the owner's iPhone, which runs iOS 27.
 
 ```bash
 bun install                      # all workspaces, from the root

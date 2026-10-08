@@ -1,11 +1,13 @@
 # Mobile Foundation — Design
 
 Date: 2026-10-05
-Status: Parts 1 and 2 shipped; Part 3 revised 2026-10-06, awaiting review
+Status: implemented (2026-10-08)
 
 ## Goal
 
 Add a native iPhone app to Stylify, next to the existing web app, that reaches feature parity with the web app today: sign in, list the wardrobe, add an item with a photo, edit, delete. Deliver it as a TestFlight build.
+
+> **2026-10-08:** TestFlight was dropped by the owner in favour of installing from Xcode onto his own iPhone (free provisioning). See `docs/mobile.md`.
 
 The app exists for three reasons: to learn React Native, to have a native app to show on a résumé, and because a wardrobe app is something people want on their phones.
 
@@ -160,6 +162,8 @@ Adding a workspace edits the root `package.json`, which triggers both deploys. B
 
 NativeWind 4.2.7 with Tailwind 3, the same Tailwind major as the web app. Its support for Expo SDK 57 is not confirmed, so the scaffold task renders one NativeWind-styled screen in the simulator before anything is built on it. If that fails, the app uses React Native's `StyleSheet` instead and NativeWind is removed; the toolchain is not debugged.
 
+> **2026-10-08:** The app was built on SDK 55, not 57, because SDK 56 and 57 do not compile on Xcode 26.3 (see `docs/mobile.md`). NativeWind 4.2.7 renders on SDK 55.
+
 ### Building and running
 
 | Stage | How | Needs |
@@ -239,6 +243,8 @@ Local development uses the production database and image bucket, so every test i
 7. Profile.
 8. Device checklist on the iPhone.
 9. Apple enrolment, EAS Build, TestFlight.
+
+> **2026-10-08:** Step 9 was dropped: TestFlight gave way to installing from Xcode onto the owner's iPhone (see `docs/mobile.md`).
 10. `docs/mobile.md` and the `AGENTS.md` update.
 
 Steps 1 and 2 are pushed to `main` with Minh's agreement. Steps 3 to 10 are built on a feature branch; nothing in `mobile/` triggers a deploy.
@@ -313,8 +319,8 @@ Resolved on 2026-10-06, for plan 2:
 - Minh installs Xcode; EAS Build is used only for TestFlight.
 - 2026-10-08: the app moved to Expo SDK 55 because SDK 56 and 57 do not compile on Xcode 26.3 (see the note at the top of Part 3).
 
-Still open, checked during plan 2 with a real token:
+Checked during plan 2 with a real token (all answered yes, 2026-10-08):
 
-- That `sub` in a mobile access token equals the `user.id` the cookie path produces for the same person.
-- That the access token's `aud` contains `https://stylify.space/api`.
-- That NativeWind 4.2.7 renders on Expo SDK 55. (Done 2026-10-08: it renders in the iPhone 17 simulator.)
+- `sub` in a mobile access token equals the `user.id` the cookie path produces for the same person: yes, the user ID equals the token's `sub` and equals the web user ID.
+- The access token's `aud` contains `https://stylify.space/api`: yes. `/api/me` returns 200 with the bearer token.
+- NativeWind 4.2.7 renders on Expo SDK 55: yes, in the iPhone 17 simulator.

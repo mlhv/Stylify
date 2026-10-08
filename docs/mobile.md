@@ -4,12 +4,35 @@ The iPhone app in `mobile/`: Expo SDK 55, Expo Router, NativeWind, the same Hono
 
 ## Run it
 
-- Needs Xcode and CocoaPods. From `mobile/`: `bunx expo run:ios --device "iPhone 17"` builds the app, starts Metro and opens it in the simulator.
+- Needs Xcode and CocoaPods. From `mobile/`: `bunx expo run:ios --device "iPhone 17"` builds the app, starts Metro and opens it in the simulator. The app has no `expo-dev-client`; `expo run:ios` builds a plain debug app that loads its JavaScript from Metro.
 - `mobile/.env.local` (not in git) holds `EXPO_PUBLIC_KINDE_DOMAIN` and `EXPO_PUBLIC_KINDE_CLIENT_ID`. `EXPO_PUBLIC_API_URL` is optional and points the app at a local API; the default is `https://stylify.space`. These values are read at build time and ship inside the app.
 - **A missing `mobile/.env.local` gives a blank screen with no error.** The Kinde provider renders nothing without its settings.
 - Checks, from `mobile/`: `bunx tsc --noEmit`, `bun test src`, `bunx expo export --platform ios`.
 - The app talks to the production database and bucket. Delete test items.
 - Editing `src/app/_layout.tsx` while the app runs: Fast Refresh re-runs that module and creates a second `QueryClient` (it is created at module scope), so lists stop updating after mutations. Relaunch the app after editing that file.
+
+### On an iPhone
+
+The app is installed from Xcode with free provisioning, no Apple Developer Program. This works on Xcode 26.3 although the owner's iPhone runs iOS 27.0.1.
+
+One-time setup:
+
+- Xcode → Settings → Accounts: add the Apple ID.
+- Open `mobile/ios/Stylify.xcworkspace` → target "Stylify" → Signing & Capabilities → "Automatically manage signing", Team = the personal team. `mobile/ios` is generated and git-ignored, so `expo prebuild --clean` loses this setting; set it again.
+- On the iPhone: Settings → Privacy & Security → Developer Mode.
+
+Install, from `mobile/`:
+
+```bash
+xcrun devicectl list devices                 # name and UDID of the phone
+bunx expo run:ios --device "<name or UDID>"
+```
+
+`--no-bundler` installs without starting Metro; run `bunx expo start` afterwards to serve the app.
+
+- **Trust the developer** on first launch: Settings → General → VPN & Device Management. Until then the launch fails with "invalid code signature ... not been explicitly trusted".
+- **The build expires after 7 days.** Run the install command again to renew it.
+- **The phone must reach Metro on the Mac:** same Wi-Fi, and Local Network allowed for Stylify (Settings → Privacy & Security → Local Network). Otherwise the app shows a red "No script URL provided" banner. The Mac's address is baked into the build, so a changed network needs a rebuild. Networks that block device-to-device traffic (common on university and office Wi-Fi) do not work; a personal hotspot does.
 
 ### Why SDK 55
 
@@ -41,8 +64,10 @@ The mapping matches the SDK's error text and is pinned by `refreshOutcome.test.t
 ## Screens and data
 
 - Routes in `src/app/`: `sign-in`, `(tabs)/index` (wardrobe grid), `(tabs)/add`, `(tabs)/profile`, `item/[id]` (edit and delete). `_layout.tsx` is the auth guard (`Stack.Protected`).
-- `src/lib/api.ts` mirrors `frontend/src/lib/api.ts`: the same query keys, and mutations write the server's response into the cache with `setQueryData`.
+- `src/lib/api.ts` mirrors `frontend/src/lib/api.ts`: the same query keys for items (only `get-all-items`, `get-total-clothes` and `get-item` overlap), and mutations write the server's response into the cache with `setQueryData`.
 - The edit screen always refetches on open, so an item deleted elsewhere is noticed.
+- The Add tab's header has a back control to Wardrobe (`src/app/(tabs)/_layout.tsx`). Tab bar icons are Ionicons from `@expo/vector-icons`, which comes with `expo` and is not declared in `mobile/package.json`.
+- The item form (`src/components/ItemForm.tsx`) handles the keyboard itself: while it is up, a spacer as tall as the part of the scroll view it covers is added, so the submit button and "Delete item" can be scrolled above it, the focused field is kept in view, and scrolling never closes the keyboard. React Native's `automaticallyAdjustKeyboardInsets` was not enough on the phone.
 - Photos: picked with `expo-image-picker` (camera or library), re-encoded to JPEG with `expo-image-manipulator` (resized to a maximum width of 1600, quality 0.8; `src/lib/upload.ts`), then uploaded straight to S3 with a `PUT` using `fetch` from `expo/fetch` and a `File` body, at the presigned URL from `GET /api/signed-url`. SDK 55's `expo-file-system` has no `File.upload`. If a save fails after the upload, a retry reuses the uploaded photo (`src/lib/reuseUpload.ts`).
 
 ### CloudFront hides API 404s
@@ -56,12 +81,15 @@ The web app has the same latent problem. The real fix is in the distribution (pl
 
 ## Release
 
-TestFlight is not set up yet. There is no `eas.json`, and a TestFlight build needs Apple Developer Program enrolment first. Nothing has been built or submitted outside the simulator.
+There is no TestFlight and no EAS: no `eas.json`, no Apple Developer Program enrolment (the owner dropped TestFlight on 2026-10-08). The app is distributed only by installing it from Xcode onto the owner's iPhone (see "On an iPhone"). TestFlight would need the Apple Developer Program and an EAS build profile.
 
 Nothing under `mobile/` triggers a deploy, and there is no CI for mobile.
 
 ## Known limits
 
+- Checked on a device on 2026-10-08 (iPhone 13 Pro, iOS 27.0.1): sign-in and wardrobe match the web; add with the camera and with the library; permission denial alert and "Open Settings"; edit name and photo; Airplane Mode during add, then retry saves once; delete; an item deleted on the web shows "This item no longer exists"; a second account sees an empty wardrobe; still signed in after force-quit. Airplane Mode with pull to refresh: the grid stays, no error is shown, and the user stays signed in.
 - A Kinde 5xx during a token refresh still signs the user out, because the SDK does not distinguish it from a rejected token (see `refreshOutcome.ts`).
+- When a refresh fails offline while cached items are shown, the grid simply stays; no message says it is stale.
+- A 401 that arrives after sign-out has finished runs sign-out a second time. It is harmless and does not loop.
 - The app icon is still the Expo placeholder.
-- Not yet checked on a device: the camera, photo permission denial, Airplane Mode, a second account, and force-quitting the app. Where possible these have been run on the simulator only.
+- Free-provisioning builds expire after 7 days.

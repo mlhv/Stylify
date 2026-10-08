@@ -12,6 +12,8 @@
 
 > **2026-10-08:** This plan now targets Expo SDK 55 (React 19.2.0, React Native 0.83.x), because SDK 56 and 57 do not compile on Xcode 26.3. Every snippet below was typechecked against SDK 57 only: re-typecheck each task and apply "the SDK wins" against `https://docs.expo.dev/versions/v55.0.0/`. Task 2 was redone as "Task 2b" (the re-scaffold brief was a working file; the result is the commits up to `7cbb3e9`); its bodies below are the SDK 57 originals.
 
+> **2026-10-08 (later):** Task 9 (TestFlight) was dropped by the owner; the app is installed from Xcode instead. Task 8 ran on the owner's iPhone with free provisioning from Xcode 26.3 on iOS 27.0.1. The task bodies below are unchanged. See `docs/mobile.md`.
+
 ## How this plan was checked
 
 On 2026-10-06 every file in this plan was written into a throwaway copy of the repo and checked there. What that proved:
