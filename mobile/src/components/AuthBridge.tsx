@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 
 import { setAuthHandlers } from '@/lib/api'
 import { KINDE_CLIENT_ID, KINDE_DOMAIN } from '@/lib/config'
+import { endSession } from '@/lib/endSession'
 import { refreshOutcome } from '@/lib/refreshOutcome'
 
 // Gives the API client the Kinde functions, and empties the query cache when the
@@ -22,7 +23,7 @@ export function AuthBridge() {
       },
       onSignedOut: async () => {
         queryClient.clear()
-        await kinde.logout({ revokeToken: false })
+        await endSession(kinde.logout, { revokeToken: false })
       },
     })
     return () => setAuthHandlers(null)

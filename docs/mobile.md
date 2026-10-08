@@ -28,6 +28,7 @@ The owner's Mac runs macOS Sequoia with Xcode 26.3 (Swift 6.2.4), the newest it 
   - 502, 503, 504 or no network: `ServerUnreachableError`. The user stays signed in and the screen offers a retry.
   - Requests that share a refresh also share its sign-out, so one ended session opens one logout.
 - Server side, a bearer token that could not be checked (Kinde's keys could not be fetched, or `KINDE_AUDIENCE` is unset) is a 503, not a 401. See `server/auth/`.
+- Sign-out (the Profile button and the automatic path) goes through `src/lib/endSession.ts`. The SDK's `logout` always opens a web-auth session to Kinde's logout URL, so the call passes `preferEphemeralSession: true`, which gives it an isolated cookie store and suppresses iOS's "wants to use virtualwardrobe.kinde.com to sign in" prompt. Kinde's browser cookie is therefore not cleared, but the SDK's `login` always sends `prompt=login`, so the next person sees the login form and signs in as themselves.
 - `src/components/AuthBridge.tsx` hands the Kinde functions to the module-level API client and clears the query cache when the session ends.
 - The profile screen reads name, email and picture from the SDK, not from `/api/me`, because the bearer token carries only the user ID.
 

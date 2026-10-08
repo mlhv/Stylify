@@ -6,6 +6,7 @@ import { Pressable, Text, View } from 'react-native'
 
 import { ErrorState } from '@/components/ErrorState'
 import { getTotalClothesQueryOptions } from '@/lib/api'
+import { endSession } from '@/lib/endSession'
 
 export default function Profile() {
   const kinde = useKindeAuth()
@@ -27,7 +28,7 @@ export default function Profile() {
   async function signOut() {
     setSigningOut(true)
     try {
-      await kinde.logout({ revokeToken: true })
+      await endSession(kinde.logout, { revokeToken: true })
     } finally {
       setSigningOut(false)
     }
