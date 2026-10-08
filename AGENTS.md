@@ -24,6 +24,9 @@ docs/       Architecture docs. Read the relevant one before changing that area.
 | `server/db/schema/items.ts` | The only table |
 | `shared/src/index.ts` | `createItemSchema`, `OutfitSuggestion` |
 | `frontend/src/lib/api.ts` | Typed Hono client and every `queryOptions` |
+| `mobile/src/lib/api.ts` | Typed Hono client and `queryOptions` for the app |
+| `mobile/src/lib/authFetch.ts` | 401/503 rules, with tests |
+| `mobile/src/app/` | Expo Router routes; `_layout.tsx` is the auth guard |
 | `frontend/src/routes/` | TanStack Router file routes; `_authenticated.tsx` is the auth guard |
 
 ## Commands
@@ -40,6 +43,8 @@ bun test ./server                # server tests
 (cd server && bunx tsc --noEmit) # server typecheck
 (cd frontend && bun run typecheck) # frontend typecheck (also runs in CI before the build)
 (cd frontend && bun run build)   # frontend build (does not typecheck)
+(cd mobile && bunx tsc --noEmit && bun test src) # mobile typecheck and tests
+(cd mobile && bunx expo run:ios --device "iPhone 17") # build and open the simulator (needs Xcode)
 ```
 
 Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`, then `bun migrate.ts`.
@@ -55,11 +60,12 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **`@tanstack/react-form` and `@tanstack/zod-form-adapter` must be on the same minor version** (both 0.32 today). A mismatch still runs but breaks the form validator types.
 - **Routes that return `c.notFound()` lose their response type in the RPC client.** `frontend/src/lib/api.ts` asserts those results to the `Item` type; keep that in mind when changing what `GET`/`PUT /api/wardrobe/:id` return.
 - **Server and web installs need `--omit=peer` as well as `--filter`.** The server's Kinde SDK has an optional peer, `expo-secure-store`, which `mobile/` puts in the lockfile. Without `--omit=peer`, `--filter server` installs Expo and React Native (about 700 packages instead of about 100). The Dockerfile and both deploy workflows use it. After changing any of them, check `docker run --rm <image> sh -c 'ls node_modules | wc -l'` prints about 57.
+- **CloudFront's SPA fallback turns API 404s into `200 text/html`.** The mobile app undoes this in `mobile/src/lib/unmaskNotFound.ts`; the web app does not.
 - **Never print or commit `.env` values.**
 
 ## Patterns
 
-- **Auth has two paths, chosen in `getUser`.** With an `Authorization: Bearer` header, the token is verified against Kinde's JWKS (issuer, audience, expiry) and only `user.id` is available; a failure is a 401 and never falls back to cookies. Without one, the httpOnly cookies set by `/api/callback` are used and the full profile is available. Route handlers should rely on `c.var.user.id` only.
+- **Auth has two paths, chosen in `getUser`.** With an `Authorization: Bearer` header, the token is verified against Kinde's JWKS (issuer, audience, expiry) and only `user.id` is available; a rejected token is a 401 and never falls back to cookies. Without one, the httpOnly cookies set by `/api/callback` are used and the full profile is available. A bearer token that could not be checked (Kinde unreachable, or `KINDE_AUDIENCE` unset) is a 503, which the mobile app treats as "server unreachable" and not as signed out. Route handlers should rely on `c.var.user.id` only.
 - **Hono RPC.** The frontend calls the API through `hc<ApiRoutes>`; do not write raw `fetch` calls to `/api`.
 - **Validation in three layers,** all from `createItemSchema` in `@stylify/shared`: TanStack Form in the browser, `zValidator` on the route, and database constraints.
 - **Cache updates.** Mutations write the server's response into the cache with `queryClient.setQueryData` after it succeeds. There are no optimistic updates.
@@ -92,6 +98,7 @@ Then, in a browser: log in, create an item, edit it, delete it, log out.
 | `docs/tanstack.md` | Query and Form usage, cache patterns |
 | `docs/zod.md` | The shared schema and validation chain |
 | `docs/hono-rpc.md` | The end-to-end type chain |
+| `docs/mobile.md` | The Expo app: running, auth, release |
 | `docs/data-flow.md` | Request traces, Vite proxy |
 | `docs/cloud-architecture.md` | Lambda, API Gateway, S3, CloudFront, DNS, manual deploy |
 | `docs/superpowers/specs/` | Design specs, including the roadmap |

@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-05-mobile-foundation-design.md` (Part 3 and `docs/mobile.md` from Part 4). Read it before starting; this plan argues from it.
 
-> **2026-10-08:** This plan now targets Expo SDK 55 (React 19.2.0, React Native 0.83.x), because SDK 56 and 57 do not compile on Xcode 26.3. Every snippet below was typechecked against SDK 57 only: re-typecheck each task and apply "the SDK wins" against `https://docs.expo.dev/versions/v55.0.0/`. Task 2 was redone as "Task 2b" (see `.superpowers/sdd/2026-10-06-expo-mobile-app/task-2b-brief.md`); its bodies below are the SDK 57 originals.
+> **2026-10-08:** This plan now targets Expo SDK 55 (React 19.2.0, React Native 0.83.x), because SDK 56 and 57 do not compile on Xcode 26.3. Every snippet below was typechecked against SDK 57 only: re-typecheck each task and apply "the SDK wins" against `https://docs.expo.dev/versions/v55.0.0/`. Task 2 was redone as "Task 2b" (the re-scaffold brief was a working file; the result is the commits up to `7cbb3e9`); its bodies below are the SDK 57 originals.
 
 ## How this plan was checked
 
