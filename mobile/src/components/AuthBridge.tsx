@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 
 import { setAuthHandlers } from '@/lib/api'
 import { KINDE_CLIENT_ID, KINDE_DOMAIN } from '@/lib/config'
+import { refreshOutcome } from '@/lib/refreshOutcome'
 
 // Gives the API client the Kinde functions, and empties the query cache when the
 // session ends so the next person to sign in never sees someone else's wardrobe.
@@ -17,7 +18,7 @@ export function AuthBridge() {
       refresh: async () => {
         if (!KINDE_DOMAIN || !KINDE_CLIENT_ID) return false
         const result = await kinde.refreshToken({ domain: KINDE_DOMAIN, clientId: KINDE_CLIENT_ID })
-        return result.success
+        return refreshOutcome(result)
       },
       onSignedOut: async () => {
         queryClient.clear()
