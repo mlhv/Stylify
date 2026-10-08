@@ -103,7 +103,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
   }
 
   return (
-    <View ref={frameRef} className="flex-1 bg-white">
+    <View ref={frameRef} collapsable={false} className="flex-1 bg-white">
       <ScrollView
         className="flex-1 bg-white"
         contentContainerClassName="gap-4 p-4"
@@ -123,7 +123,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
             <Text className="text-neutral-500">No photo yet</Text>
           </View>
         )}
-  
+
         <View className="flex-row gap-3">
           <Pressable className="flex-1 items-center rounded-lg bg-neutral-200 py-3" onPress={() => choose('camera')}>
             <Text className="font-semibold">Take photo</Text>
@@ -132,7 +132,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
             <Text className="font-semibold">Choose photo</Text>
           </Pressable>
         </View>
-  
+
         {FIELDS.map(({ name, label }) => (
           <form.Field key={name} name={name} validators={{ onChange: createItemSchema.shape[name] }}>
             {(field) => (
@@ -150,7 +150,11 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
                     // Moving from one field to another with the keyboard already up.
                     if (keyboardInset > 0) revealFocusedField(keyboardInset)
                   }}
-                  onBlur={field.handleBlur}
+                  onBlur={() => {
+                  // Only if this field still owns the focus: moving to another field has already set it.
+                  if (focusedField.current === name) focusedField.current = null
+                  field.handleBlur()
+                }}
                   onChangeText={field.handleChange}
                   accessibilityLabel={label}
                 />
@@ -161,9 +165,9 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
             )}
           </form.Field>
         ))}
-  
+
         {error ? <Text className="text-red-600">{error}</Text> : null}
-  
+
         <form.Subscribe selector={(state) => [state.canSubmit, state.isSubmitting] as const}>
           {([canSubmit, isSubmitting]) => (
             <Pressable
