@@ -4,6 +4,7 @@ import { KindeAuthProvider, useKindeAuth } from '@kinde/expo'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 import { useSyncExternalStore } from 'react'
+import { View } from 'react-native'
 
 import { AuthBridge } from '@/components/AuthBridge'
 import { ItemNotFoundError } from '@/lib/api'
@@ -26,7 +27,8 @@ const queryClient = new QueryClient({
 
 function RootStack() {
   const { isAuthenticated, isLoading } = useKindeAuth()
-  if (isLoading) return null
+  // Same colour as the sign-in screen, so the gap while the provider starts is not seen.
+  if (isLoading) return <View className="flex-1 bg-white" />
 
   return (
     <Stack>
@@ -44,12 +46,16 @@ function RootStack() {
 export default function RootLayout() {
   // Signing out bumps this, which remounts the provider so it forgets the session.
   const epoch = useSyncExternalStore(subscribeAuthReset, authResetEpoch)
+  // The provider renders nothing while it restarts after sign-out; this white view stays behind it
+  // so the native (black) window never shows through.
   return (
-    <KindeAuthProvider key={epoch} config={{ domain: KINDE_DOMAIN, clientId: KINDE_CLIENT_ID }}>
-      <QueryClientProvider client={queryClient}>
-        <AuthBridge />
-        <RootStack />
-      </QueryClientProvider>
-    </KindeAuthProvider>
+    <View className="flex-1 bg-white">
+      <KindeAuthProvider key={epoch} config={{ domain: KINDE_DOMAIN, clientId: KINDE_CLIENT_ID }}>
+        <QueryClientProvider client={queryClient}>
+          <AuthBridge />
+          <RootStack />
+        </QueryClientProvider>
+      </KindeAuthProvider>
+    </View>
   )
 }
