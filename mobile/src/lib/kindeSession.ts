@@ -28,6 +28,19 @@ export async function clearLocalTokens(deps: {
   if (insecure && insecure !== active) await insecure.removeSessionItem(StorageKeys.refreshToken)
 }
 
+// Whether the device holds a refresh token. The provider reports "signed in" only after a network
+// refresh succeeds, so offline it says no even though the session is still on the device.
+export async function hasStoredRefreshToken(deps: { active: () => Store | null }): Promise<boolean> {
+  try {
+    const token = await deps.active()?.getSessionItem(StorageKeys.refreshToken)
+    return typeof token === 'string' && token.length > 0
+  } catch {
+    return false
+  }
+}
+
+export const readHasStoredRefreshToken = () => hasStoredRefreshToken({ active: getActiveStorage })
+
 // Re-check against @kinde/expo's logout (dist/index.mjs) when upgrading it.
 export const kindeSessionEnd: SessionEnd = {
   readRefreshToken: async () => {

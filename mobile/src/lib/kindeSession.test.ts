@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 import pkg from '../../package.json'
 import expoPkg from '../../../node_modules/@kinde/expo/package.json'
-import { clearLocalTokens } from './kindeSession'
+import { clearLocalTokens, hasStoredRefreshToken } from './kindeSession'
 
 const resolveFrom = (dir: string) => realpathSync(require.resolve('@kinde/js-utils', { paths: [resolve(__dirname, dir)] }))
 
@@ -52,5 +52,25 @@ describe('clearLocalTokens', () => {
     const clearTimer = mock(() => {})
     await expect(clearLocalTokens({ active: () => store as never, insecure: () => null, clearTimer })).rejects.toThrow('keychain')
     expect(clearTimer).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('hasStoredRefreshToken', () => {
+  const storeWith = (value: unknown) => ({ getSessionItem: mock(async () => value) }) as never
+
+  test('is true when a refresh token is stored', async () => {
+    expect(await hasStoredRefreshToken({ active: () => storeWith('r') })).toBe(true)
+  })
+
+  test('is false when none is stored, or the value is not a string', async () => {
+    expect(await hasStoredRefreshToken({ active: () => storeWith(null) })).toBe(false)
+    expect(await hasStoredRefreshToken({ active: () => storeWith('') })).toBe(false)
+    expect(await hasStoredRefreshToken({ active: () => storeWith(5) })).toBe(false)
+  })
+
+  test('is false when the storage is not ready or cannot be read', async () => {
+    expect(await hasStoredRefreshToken({ active: () => null })).toBe(false)
+    const broken = { getSessionItem: async () => Promise.reject(new Error('keychain')) } as never
+    expect(await hasStoredRefreshToken({ active: () => broken })).toBe(false)
   })
 })
