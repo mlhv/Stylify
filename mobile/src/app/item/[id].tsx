@@ -12,6 +12,7 @@ import {
   getItemQueryOptions,
   getTotalClothesQueryOptions,
   ItemNotFoundError,
+  type Item,
 } from '@/lib/api'
 import { uploadImage } from '@/lib/upload'
 
@@ -38,7 +39,8 @@ export default function EditItem() {
     refetchOnMount: 'always',
   })
   const dropped = useRef(false)
-  const gone = error instanceof ItemNotFoundError
+  const [savedGone, setSavedGone] = useState(false)
+  const gone = savedGone || error instanceof ItemNotFoundError
 
   useEffect(() => {
     if (!gone || dropped.current) return
@@ -47,7 +49,7 @@ export default function EditItem() {
   }, [gone, id, queryClient])
 
   if (!Number.isInteger(id)) return <ErrorState error={new Error('This item does not exist')} onRetry={() => router.back()} />
-  if (gone) return <ErrorState error={error} retryLabel="Back to wardrobe" onRetry={() => router.back()} />
+  if (gone) return <ErrorState error={error ?? new ItemNotFoundError()} retryLabel="Back to wardrobe" onRetry={() => router.back()} />
   if (isPending) return <ActivityIndicator className="flex-1" />
   if (error && !data) return <ErrorState error={error} onRetry={() => void refetch()} />
 
@@ -55,7 +57,17 @@ export default function EditItem() {
 
   async function save(fields: ItemFields, photoUri: string | null) {
     const imageUrl = photoUri ? await uploadImage(photoUri) : item.imageUrl
-    const updated = await editItem({ id, value: { ...fields, imageUrl } })
+    let updated: Item
+    try {
+      updated = await editItem({ id, value: { ...fields, imageUrl } })
+    } catch (e) {
+      // Deleted elsewhere: the form can never save, so show the "no longer exists" state.
+      if (e instanceof ItemNotFoundError) {
+        setSavedGone(true)
+        return
+      }
+      throw e
+    }
     queryClient.setQueryData(getItemQueryOptions(id).queryKey, { item: updated })
     queryClient.setQueryData(getAllItemsQueryOptions.queryKey, (old) =>
       old ? { ...old, items: old.items.map((existing) => (existing.id === id ? updated : existing)) } : old,

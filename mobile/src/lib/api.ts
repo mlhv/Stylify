@@ -5,6 +5,7 @@ import type { createItem as CreateItem } from '@stylify/shared'
 
 import { createAuthFetch, type AuthFetchDeps } from './authFetch'
 import { API_URL } from './config'
+import { unmaskNotFound } from './unmaskNotFound'
 
 type AuthHandlers = Omit<AuthFetchDeps, 'fetchImpl'>
 
@@ -24,7 +25,7 @@ const authFetch = createAuthFetch({
   },
 })
 
-const client = hc<ApiRoutes>(API_URL, { fetch: authFetch })
+const client = hc<ApiRoutes>(API_URL, { fetch: unmaskNotFound(authFetch) })
 
 export const api = client.api
 
@@ -97,11 +98,14 @@ export async function createItem({ value }: { value: CreateItem }) {
 
 export async function editItem({ id, value }: { id: number; value: CreateItem }) {
   const res = await api.wardrobe[':id{[0-9]+}'].$put({ param: { id: id.toString() }, json: value })
+  if (res.status === 404) throw new ItemNotFoundError()
   if (!res.ok) throw new Error('Could not save the item')
   return (await res.json()) as Item
 }
 
 export async function deleteItem({ id }: { id: number }) {
   const res = await api.wardrobe[':id{[0-9]+}'].$delete({ param: { id: id.toString() } })
+  // Already gone is the outcome the user asked for.
+  if (res.status === 404) return
   if (!res.ok) throw new Error('Could not delete the item')
 }
