@@ -1,21 +1,35 @@
 import '../../global.css'
 
 import { KindeAuthProvider, useKindeAuth } from '@kinde/expo'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Stack } from 'expo-router'
 
+import { AuthBridge } from '@/components/AuthBridge'
+import { ServerUnreachableError, SignedOutError } from '@/lib/authFetch'
 import { KINDE_CLIENT_ID, KINDE_DOMAIN } from '@/lib/config'
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Retrying cannot fix a signed-out session, and "unreachable" gets its own retry button.
+      retry: (failures, error) =>
+        !(error instanceof SignedOutError) && !(error instanceof ServerUnreachableError) && failures < 2,
+    },
+  },
+})
 
 function RootStack() {
   const { isAuthenticated, isLoading } = useKindeAuth()
   if (isLoading) return null
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack>
       <Stack.Protected guard={isAuthenticated}>
-        <Stack.Screen name="debug-auth" />
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="item/[id]" options={{ title: 'Edit item' }} />
       </Stack.Protected>
       <Stack.Protected guard={!isAuthenticated}>
-        <Stack.Screen name="sign-in" />
+        <Stack.Screen name="sign-in" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>
   )
@@ -24,7 +38,10 @@ function RootStack() {
 export default function RootLayout() {
   return (
     <KindeAuthProvider config={{ domain: KINDE_DOMAIN, clientId: KINDE_CLIENT_ID }}>
-      <RootStack />
+      <QueryClientProvider client={queryClient}>
+        <AuthBridge />
+        <RootStack />
+      </QueryClientProvider>
     </KindeAuthProvider>
   )
 }

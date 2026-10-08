@@ -1,5 +1,4 @@
 import { useKindeAuth } from '@kinde/expo'
-import { makeRedirectUri } from 'expo-auth-session'
 import { useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 
@@ -31,7 +30,6 @@ export default function SignIn() {
         {busy ? <ActivityIndicator color="white" /> : <Text className="font-semibold text-white">Sign in</Text>}
       </Pressable>
       {error ? <Text className="text-center text-red-600">{error}</Text> : null}
-      <Text selectable className="text-xs text-neutral-500">Redirect URI: {makeRedirectUri()}</Text>
     </View>
   )
 }
