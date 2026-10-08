@@ -30,6 +30,8 @@ docs/       Architecture docs. Read the relevant one before changing that area.
 
 Bun is pinned to 1.3.13 locally, in CI and in the Dockerfile.
 
+Xcode on the owner's Mac is 26.3 with the iOS 26.3.1 simulator runtime. The Mac runs macOS Sequoia, and these are the newest versions it supports, so do not suggest a newer Xcode or simulator; if a tool requires one, say so and stop.
+
 ```bash
 bun install                      # all workspaces, from the root
 bun run dev                      # API on :8080
