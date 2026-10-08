@@ -27,7 +27,7 @@ const UNREACHABLE = new Set([502, 503, 504])
 
 export function createAuthFetch(deps: AuthFetchDeps) {
   let refreshing: Promise<boolean> | null = null
-  // Requests that share a refresh share its sign-out, so one ended session opens one logout.
+  // Requests that share a refresh share its sign-out, so one ended session signs out once.
   const signOuts = new WeakMap<Promise<boolean>, Promise<void>>()
 
   // Requests that fail together share one refresh.

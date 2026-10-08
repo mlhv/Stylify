@@ -57,12 +57,6 @@ export const getTotalClothesQueryOptions = queryOptions({
   staleTime: 1000 * 60 * 5,
 })
 
-export async function getCurrentUser() {
-  const res = await api.me.$get()
-  if (!res.ok) throw new Error('Could not load the current user')
-  return res.json()
-}
-
 export class ItemNotFoundError extends Error {
   constructor() {
     super('This item no longer exists')

@@ -14,7 +14,8 @@ export default function SignIn() {
     setError(null)
     try {
       const result = await kinde.login({ audience: KINDE_AUDIENCE })
-      if (!result.success) setError(result.errorMessage)
+      // The SDK words any non-success result, including closing the sheet, as 'Unknown error'; that is not worth showing.
+      if (!result.success && result.errorMessage !== 'Unknown error') setError(result.errorMessage)
     } catch {
       setError('Could not open sign-in. Try again.')
     } finally {

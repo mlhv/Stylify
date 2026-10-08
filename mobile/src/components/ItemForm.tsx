@@ -59,6 +59,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
   }
 
   useEffect(() => {
+    // keyboardWillChangeFrame is iOS-only (this app is iPhone-only).
     const sub = Keyboard.addListener('keyboardWillChangeFrame', (event) => {
       frameRef.current?.measureInWindow((_x, y, _width, height) => {
         setKeyboardInset(Math.max(0, y + height - event.endCoordinates.screenY))
@@ -151,10 +152,10 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
                     if (keyboardInset > 0) revealFocusedField(keyboardInset)
                   }}
                   onBlur={() => {
-                  // Only if this field still owns the focus: moving to another field has already set it.
-                  if (focusedField.current === name) focusedField.current = null
-                  field.handleBlur()
-                }}
+                    // Only if this field still owns the focus: moving to another field has already set it.
+                    if (focusedField.current === name) focusedField.current = null
+                    field.handleBlur()
+                  }}
                   onChangeText={field.handleChange}
                   accessibilityLabel={label}
                 />

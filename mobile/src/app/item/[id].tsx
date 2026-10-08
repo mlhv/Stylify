@@ -84,6 +84,8 @@ export default function EditItem() {
   }
 
   async function remove() {
+    // The screen can re-render during the pop; without this the `gone` effect would drop the count again.
+    dropped.current = true
     setDeleting(true)
     try {
       await deleteItem({ id })
@@ -91,6 +93,7 @@ export default function EditItem() {
       queryClient.removeQueries({ queryKey: getItemQueryOptions(id).queryKey })
       router.back()
     } catch (e) {
+      dropped.current = false
       setDeleting(false)
       Alert.alert('Could not delete', errorMessage(e))
     }
