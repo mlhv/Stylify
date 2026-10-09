@@ -1,5 +1,5 @@
 import { useKindeAuth } from '@kinde/expo'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Image } from 'expo-image'
 import { useState } from 'react'
 import { Alert, Pressable, Text, View } from 'react-native'
@@ -11,6 +11,7 @@ import { kindeSessionEnd } from '@/lib/kindeSession'
 
 export default function Profile() {
   const kinde = useKindeAuth()
+  const queryClient = useQueryClient()
   // The bearer token carries only the user ID, so the profile comes from the SDK.
   const profile = useQuery({
     queryKey: ['kinde-profile'],
@@ -29,6 +30,8 @@ export default function Profile() {
   async function signOut() {
     setSigningOut(true)
     try {
+      // Same as the automatic path: the next person to sign in must not see this wardrobe.
+      queryClient.clear()
       await endSession(kindeSessionEnd)
     } catch (e) {
       Alert.alert('Could not sign out', errorMessage(e))

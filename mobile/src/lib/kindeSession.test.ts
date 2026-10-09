@@ -57,9 +57,19 @@ describe('clearLocalTokens', () => {
 
 describe('hasStoredRefreshToken', () => {
   const storeWith = (value: unknown) => ({ getSessionItem: mock(async () => value) }) as never
+  // Holds a value for one key only, like the real store.
+  const storeWithKey = (key: string, value: string) =>
+    ({ getSessionItem: mock(async (k: string) => (k === key ? value : null)) }) as never
 
   test('is true when a refresh token is stored', async () => {
     expect(await hasStoredRefreshToken({ active: () => storeWith('r') })).toBe(true)
+  })
+
+  test('reads the refresh token key, and only that key', async () => {
+    const store = storeWithKey('refreshToken', 'r')
+    expect(await hasStoredRefreshToken({ active: () => store })).toBe(true)
+    expect((store as { getSessionItem: { mock: { calls: unknown[][] } } }).getSessionItem.mock.calls).toEqual([['refreshToken']])
+    expect(await hasStoredRefreshToken({ active: () => storeWithKey('accessToken', 'a') })).toBe(false)
   })
 
   test('is false when none is stored, or the value is not a string', async () => {
