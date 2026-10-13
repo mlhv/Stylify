@@ -42,6 +42,7 @@ bun run dev                      # API on :8080
 bun run dev:frontend             # Vite on :5173, proxies /api to :8080
 bun test ./server                # server tests
 bun test ./infra                 # CloudFront Function tests
+bun test ./frontend              # web API client tests (excluded from the frontend typecheck)
 (cd server && bunx tsc --noEmit) # server typecheck
 (cd frontend && bun run typecheck) # frontend typecheck (also runs in CI before the build)
 (cd frontend && bun run build)   # frontend build (does not typecheck)

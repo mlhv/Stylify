@@ -428,6 +428,17 @@ they also turned API 403/404 answers into `200 text/html`. Do not add them back.
 
 A static file that does not exist answers 403, not 404: the bucket policy grants
 `s3:GetObject` only, and S3 hides whether a key exists from callers who cannot list.
+That includes paths nobody uploaded, such as `/favicon.ico` and `/robots.txt`, which
+show S3's XML "AccessDenied" page.
+
+Two consequences of the rule to keep in mind:
+
+- **A file without an extension at the bucket root cannot be served**, because the
+  function sends every extensionless path to the app. iOS universal links need
+  `/.well-known/apple-app-site-association`; adding them means letting `/.well-known/`
+  through in the function first.
+- **`/api` without a trailing slash is not an API path.** The behaviour pattern is
+  `/api/*`, so bare `/api` goes to S3 and gets the app shell.
 
 #### Changing the function
 

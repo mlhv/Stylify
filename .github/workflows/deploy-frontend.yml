@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile --omit=peer --filter frontend --filter server
 
+      - name: Test
+        run: bun test ./frontend
+
       - name: Typecheck
         working-directory: frontend
         run: bun run typecheck
