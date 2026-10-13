@@ -120,6 +120,8 @@ Same form as create, pre-populated with the existing item's data. Fetches the it
 
 After success: replaces the item in the cached items list.
 
+If the item was deleted (here or on the phone), `GET`/`PUT /api/wardrobe/:id` answer 404 and `getItem`/`editItem` throw `ItemNotFoundError`. The page then shows "This item no longer exists" with a button back to the wardrobe, and the items list and count are refetched. A 404 is not retried (`retryUnlessNotFound`); any other load failure shows "Could not load this item" with "Try again". `frontend/src/lib/api.test.ts` covers the client side (`bun test ./frontend`).
+
 ### Profile (`_authenticated/profile.tsx`)
 
 Shows the current user's avatar (initials), name, and email from `userQueryOptions`. Has a **Logout** button that navigates to `/api/logout` (backend clears cookies and redirects to Kinde).

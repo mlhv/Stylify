@@ -96,8 +96,24 @@ export const getSignedURLQueryOptions = queryOptions({
     queryFn: getSignedURL,
 })
 
+// The item was deleted, here or on another device.
+export class ItemNotFoundError extends Error {
+  constructor() {
+    super('This item no longer exists')
+    this.name = 'ItemNotFoundError'
+  }
+}
+
+// A missing item will still be missing on the next try.
+export function retryUnlessNotFound(failureCount: number, error: Error) {
+  return !(error instanceof ItemNotFoundError) && failureCount < 3
+}
+
 export async function editItem({ id, value }: { id: number; value: createItem }) {
   const res = await api.wardrobe[':id{[0-9]+}'].$put({ param: { id: id.toString() }, json: value })
+  if (res.status === 404) {
+    throw new ItemNotFoundError()
+  }
   if (!res.ok) {
     throw new Error('Network response was not ok')
   }
@@ -115,6 +131,9 @@ export const loadingEditItemQueryOptions = queryOptions<{ item?: createItem }>({
 
 export async function getItem({ id }: { id: number }) {
   const res = await api.wardrobe[':id{[0-9]+}'].$get({ param: { id: id.toString() } })
+  if (res.status === 404) {
+    throw new ItemNotFoundError()
+  }
   if (!res.ok) {
     throw new Error('Network response was not ok')
   }
@@ -126,6 +145,7 @@ export const getItemQueryOptions = (id: number) => queryOptions({
     queryKey: ['get-item', id],
     queryFn: () => getItem({ id }),
     staleTime: 1000 * 60 * 5,
+    retry: retryUnlessNotFound,
 })
 
 export async function markAsWorn({ id }: { id: number }) {

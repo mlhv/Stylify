@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label'
 import { useForm } from '@tanstack/react-form'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 import {
   editItem,
@@ -13,6 +13,8 @@ import {
   loadingEditItemQueryOptions,
   getItemQueryOptions,
   getSignedURL,
+  getTotalClothesQueryOptions,
+  ItemNotFoundError,
 } from '@/lib/api'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { zodValidator } from '@tanstack/zod-form-adapter'
@@ -31,9 +33,22 @@ function EditItem() {
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined)
 
   // Fetch the current item data
-  const { data: itemData, isLoading } = useQuery(
+  const { data: itemData, isLoading, error, refetch } = useQuery(
     getItemQueryOptions(itemId),
   )
+  const itemIsGone = error instanceof ItemNotFoundError
+
+  // The wardrobe list and count may still show an item that was deleted elsewhere.
+  const forgetItem = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: getAllItemsQueryOptions.queryKey })
+    queryClient.invalidateQueries({ queryKey: getTotalClothesQueryOptions.queryKey })
+  }, [queryClient])
+
+  useEffect(() => {
+    if (itemIsGone) {
+      forgetItem()
+    }
+  }, [itemIsGone, forgetItem])
 
   const form = useForm({
     validatorAdapter: zodValidator(),
@@ -101,9 +116,16 @@ function EditItem() {
           item: undefined
         })
 
-        toast('An error occurred', {
-          description: 'Failed to update item',
-        })
+        if (error instanceof ItemNotFoundError) {
+          forgetItem()
+          toast('Item not updated', {
+            description: 'This item no longer exists',
+          })
+        } else {
+          toast('An error occurred', {
+            description: 'Failed to update item',
+          })
+        }
       } finally {
         queryClient.setQueryData(loadingEditItemQueryOptions.queryKey, {})
       }
@@ -139,6 +161,25 @@ function EditItem() {
 
   if (isLoading) {
     return <div>Loading...</div>
+  }
+
+  if (itemIsGone) {
+    return (
+      <div className="max-w-md mx-auto mt-8">
+        <h1 className="text-2xl font-bold mb-4">This item no longer exists</h1>
+        <p className="mb-4">It may have been deleted on another device.</p>
+        <Button onClick={() => navigate({ to: '/' })}>Back to wardrobe</Button>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-md mx-auto mt-8">
+        <h1 className="text-2xl font-bold mb-4">Could not load this item</h1>
+        <Button onClick={() => refetch()}>Try again</Button>
+      </div>
+    )
   }
 
   // Rest of the component JSX is similar to create-item.tsx
