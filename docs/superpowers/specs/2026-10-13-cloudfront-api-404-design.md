@@ -1,6 +1,6 @@
 # CloudFront: stop masking API 404s
 
-Status: draft, awaiting review
+Status: implemented (2026-10-13)
 Date: 2026-10-13
 
 ## Problem

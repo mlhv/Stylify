@@ -297,6 +297,9 @@ so the browser receives `index.html` from S3 instead of the API response. This m
 look like the behavior wasn't routing to API Gateway at all, when in reality it was —
 and API Gateway was immediately rejecting every request.
 
+(The custom error rule was removed on 2026-10-13; an API Gateway 403 now reaches the
+browser as a 403. See "SPA Routing Configuration".)
+
 ```
 Browser → stylify.space/api/login
               │
@@ -413,8 +416,33 @@ are handled client-side by TanStack Router. But S3 only knows about `index.html`
 if someone bookmarks `yourdomain.com/profile` and navigates directly to it, S3 returns
 a 403 (file not found).
 
-Fix: configure CloudFront to return `index.html` with a `200` status for any 403/404
-error. The React app boots, TanStack Router reads the URL, and renders the right page.
+Fix: the CloudFront Function `stylify-spa-rewrite` (source: `infra/cloudfront/spa-rewrite.js`)
+runs on every viewer request to the default (S3) behaviour. If the last path segment has
+no dot (`/profile`, `/edit-item/123`), it rewrites the request to `/index.html`; anything
+with a file extension passes through. The React app boots, TanStack Router reads the URL,
+and renders the right page. `/api/*` has its own behaviour and never runs the function.
+
+The distribution has **no custom error responses**. Until 2026-10-13 it had two (403 and
+404 → `/index.html` with status 200). Custom error responses apply to every origin, so
+they also turned API 403/404 answers into `200 text/html`. Do not add them back.
+
+A static file that does not exist answers 403, not 404: the bucket policy grants
+`s3:GetObject` only, and S3 hides whether a key exists from callers who cannot list.
+
+#### Changing the function
+
+```bash
+bun test ./infra
+ETAG=$(aws cloudfront describe-function --name stylify-spa-rewrite --query ETag --output text)
+aws cloudfront update-function --name stylify-spa-rewrite --if-match $ETAG \
+  --function-config 'Comment=SPA deep links: extensionless paths to /index.html,Runtime=cloudfront-js-2.0' \
+  --function-code fileb://infra/cloudfront/spa-rewrite.js
+# Test the DEVELOPMENT stage with `aws cloudfront test-function` for /profile and
+# /assets/x.js, then publish with the ETag that update-function returned:
+aws cloudfront publish-function --name stylify-spa-rewrite --if-match <ETag>
+```
+
+Publishing updates the live function; the distribution does not need to change.
 
 ---
 
@@ -457,7 +485,7 @@ One CloudFront distribution handles both the frontend and the API using **cache 
 | Path Pattern | Origin | Behavior |
 |---|---|---|
 | `/api/*` | API Gateway URL | Forward all headers + methods, no caching |
-| `/*` (default) | S3 bucket | Cache aggressively, return `index.html` on 404 |
+| `/*` (default) | S3 bucket | Cache aggressively; `stylify-spa-rewrite` serves `index.html` for client routes |
 
 The browser never knows the HTML came from S3 and the data came from Lambda.
 It all looks like one seamless domain.

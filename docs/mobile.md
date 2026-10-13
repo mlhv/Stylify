@@ -71,14 +71,14 @@ The mapping matches the SDK's error text and is pinned by `refreshOutcome.test.t
 - The item form (`src/components/ItemForm.tsx`) handles the keyboard itself: while it is up, a spacer as tall as the part of the scroll view it covers is added, so the submit button and "Delete item" can be scrolled above it, the focused field is kept in view, and scrolling never closes the keyboard. React Native's `automaticallyAdjustKeyboardInsets` was not enough on the phone.
 - Photos: picked with `expo-image-picker` (camera or library), re-encoded to JPEG with `expo-image-manipulator` (resized to a maximum width of 1600, quality 0.8; `src/lib/upload.ts`), then uploaded straight to S3 with a `PUT` using `fetch` from `expo/fetch` and a `File` body, at the presigned URL from `GET /api/signed-url`. SDK 55's `expo-file-system` has no `File.upload`. If a save fails after the upload, a retry reuses the uploaded photo (`src/lib/reuseUpload.ts`).
 
-### CloudFront hides API 404s
+### Missing items and `unmaskNotFound`
 
-The CloudFront distribution's SPA fallback turns any origin 404 into `200 text/html`, so a missing item arrives as a "successful" page. `src/lib/unmaskNotFound.ts` wraps the API client's fetch and turns a 2xx answer whose content type is not JSON back into a 404.
+Until 2026-10-13 the CloudFront distribution turned any origin 404 into `200 text/html`, so a missing item arrived as a "successful" page. That was fixed in the distribution (see `docs/cloud-architecture.md`, "SPA Routing Configuration"): a missing item now answers 404. `src/lib/unmaskNotFound.ts` still wraps the API client's fetch and turns a 2xx answer whose content type is not JSON back into a 404; it is a guard against the masking coming back and does nothing while API 404s arrive as 404.
 
 - Opening or saving a deleted item shows "This item no longer exists".
 - Deleting an already-deleted item counts as done.
 
-The web app has the same latent problem. The real fix is in the distribution (planned follow-up); `unmaskNotFound` stays until that is live.
+Removing `unmaskNotFound` is a possible clean-up, not a requirement.
 
 ## Release
 

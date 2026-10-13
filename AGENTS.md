@@ -10,6 +10,7 @@ frontend/   React 19 + Vite SPA. Deployed to S3 behind CloudFront.
 shared/     @stylify/shared: Zod schemas and types used by server and frontend.
 mobile/     Expo SDK 55 iPhone app. Not deployed by CI.
 drizzle/    SQL migrations (generated; do not hand-edit).
+infra/      CloudFront Function source. Published by hand; not deployed by CI.
 docs/       Architecture docs. Read the relevant one before changing that area.
 ```
 
@@ -40,6 +41,7 @@ bun install                      # all workspaces, from the root
 bun run dev                      # API on :8080
 bun run dev:frontend             # Vite on :5173, proxies /api to :8080
 bun test ./server                # server tests
+bun test ./infra                 # CloudFront Function tests
 (cd server && bunx tsc --noEmit) # server typecheck
 (cd frontend && bun run typecheck) # frontend typecheck (also runs in CI before the build)
 (cd frontend && bun run build)   # frontend build (does not typecheck)
@@ -60,7 +62,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **`@tanstack/react-form` and `@tanstack/zod-form-adapter` must be on the same minor version** (both 0.32 today). A mismatch still runs but breaks the form validator types.
 - **Routes that return `c.notFound()` lose their response type in the RPC client.** `frontend/src/lib/api.ts` asserts those results to the `Item` type; keep that in mind when changing what `GET`/`PUT /api/wardrobe/:id` return.
 - **Server and web installs need `--omit=peer` as well as `--filter`.** The server's Kinde SDK has an optional peer, `expo-secure-store`, which `mobile/` puts in the lockfile. Without `--omit=peer`, `--filter server` installs Expo and React Native (about 700 packages instead of about 100). The Dockerfile and both deploy workflows use it. After changing any of them, check `docker run --rm <image> sh -c 'ls node_modules | wc -l'` prints about 57.
-- **CloudFront's SPA fallback turns API 404s into `200 text/html`.** The mobile app undoes this in `mobile/src/lib/unmaskNotFound.ts`; the web app does not.
+- **API 404s reach clients as 404 since 2026-10-13.** Before that, CloudFront turned them into `200 text/html`. `mobile/src/lib/unmaskNotFound.ts` is kept as a guard and is a no-op while that holds.
 - **Never print or commit `.env` values.**
 
 ## Patterns
@@ -77,6 +79,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - Backend: Lambda `stylifyServer` (us-east-1) from ECR `wardrobe-app`, behind API Gateway HTTP API `qc21edd692`.
 - Images: S3 bucket `stylify-local-minh` (us-east-2).
 - CloudFront sends `/api/*` to API Gateway and everything else to S3. The `/api/*` behaviour must use the `AllViewerExceptHostHeader` origin request policy; `AllViewer` makes API Gateway return 403.
+- Client routes are served by the CloudFront Function `stylify-spa-rewrite` (`infra/cloudfront/spa-rewrite.js`) on the default behaviour. Do not add custom error responses to the distribution: they apply to `/api/*` too and turn API 404s into `200 text/html`.
 - Lambda environment variables, as set on 2026-10-05: `DATABASE_URL`, `KINDE_DOMAIN`, `KINDE_ISSUER_URL`, `KINDE_CLIENT_ID`, `KINDE_CLIENT_SECRET`, `KINDE_REDIRECT_URI`, `KINDE_LOGOUT_REDIRECT_URI`, `KINDE_AUDIENCE` (`https://stylify.space/api`, required for bearer auth), `AWS_BUCKET_NAME`, `AWS_BUCKET_REGION`. **Not set on Lambda:** `GEMINI_API_KEY` (so `/api/recommendations` returns an empty list on the live site until it is added) and `FRONTEND_URL` (the login callback falls back to `/`, which is correct in production). Both are in the local `.env`.
 
 Smoke test after any deploy:
