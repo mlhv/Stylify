@@ -8,7 +8,6 @@
     "scheme": "stylify",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "space.stylify.app"
     },
     "android": {
