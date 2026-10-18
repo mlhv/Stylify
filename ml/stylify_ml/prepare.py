@@ -1,0 +1,198 @@
+"""Build the crop cache and manifest.csv from raw DeepFashion2 and DeepFashion-MultiModal data."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import shutil
+from collections import Counter
+from dataclasses import dataclass
+from pathlib import Path
+
+import numpy as np
+from PIL import Image
+
+from .boxes import Box, mask_box, short_side, widen
+from .labels import DF2_CATEGORY_TO_LABEL, LABELS, MM_CLASS_TO_LABEL
+from .manifest import Row, cap_per_label, mm_item_id, mm_split, write_manifest
+
+GARMENT_LABELS = {"top", "outerwear", "trousers", "shorts", "skirt", "dress"}
+LONG_SIDE = 256
+JPEG_QUALITY = 90
+SUMMARY_KEYS = (
+    "crops", "skipped_occluded", "skipped_small", "skipped_degenerate",
+    "skipped_unreadable", "skipped_missing", "skipped_unknown_category", "dropped_by_cap",
+)
+
+
+@dataclass(frozen=True)
+class _Pending:
+    row: Row
+    image: Path
+    box: Box  # already widened
+
+
+def _open_rgb(path: Path) -> Image.Image | None:
+    try:
+        with Image.open(path) as img:
+            return img.convert("RGB")
+    except Exception:
+        return None
+
+
+def _collect_df2(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
+    pending: list[_Pending] = []
+    for dir_name, split in (("train", "train"), ("validation", "val")):
+        base = data / "raw" / "deepfashion2" / dir_name
+        for anno_path in sorted((base / "annos").glob("*.json")):
+            stem = anno_path.stem
+            image_path = base / "image" / f"{stem}.jpg"
+            try:
+                anno = json.loads(anno_path.read_text())
+                origin = str(anno["source"])
+                group = f"df2:{split}:{anno['pair_id']}"
+                items = [(k, v) for k, v in sorted(anno.items()) if k.startswith("item") and isinstance(v, dict)]
+            except Exception:
+                counts["skipped_unreadable"] += 1
+                continue
+            if not image_path.exists():
+                counts["skipped_missing"] += 1
+                continue
+            image = _open_rgb(image_path)
+            if image is None:
+                counts["skipped_unreadable"] += 1
+                continue
+            width, height = image.size
+            for key, item in items:
+                if item.get("occlusion") == 3:
+                    counts["skipped_occluded"] += 1
+                    continue
+                label = DF2_CATEGORY_TO_LABEL.get(item.get("category_id"))
+                if label is None:
+                    counts["skipped_unknown_category"] += 1
+                    continue
+                x1, y1, x2, y2 = (int(v) for v in item["bounding_box"])
+                box = (max(0, x1), max(0, y1), min(width, x2), min(height, y2))
+                if box[2] <= box[0] or box[3] <= box[1]:
+                    counts["skipped_degenerate"] += 1
+                    continue
+                if short_side(box) < min_side:
+                    counts["skipped_small"] += 1
+                    continue
+                k = key.removeprefix("item")
+                row = Row(
+                    path=f"crops/{label}/df2-{split}-{stem}-{k}.jpg",
+                    label=label, source="df2", split=split, group=group, origin=origin,
+                )
+                pending.append(_Pending(row, image_path, widen(box, width, height)))
+    return pending
+
+
+def _collect_mm(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
+    pending: list[_Pending] = []
+    base = data / "raw" / "multimodal"
+    for mask_path in sorted((base / "parsing").glob("*_segm.png")):
+        stem = mask_path.name.removesuffix("_segm.png")
+        image_path = base / "images" / f"{stem}.jpg"
+        try:
+            item_id = mm_item_id(stem)
+        except ValueError:
+            counts["skipped_unreadable"] += 1
+            continue
+        if not image_path.exists():
+            counts["skipped_missing"] += 1
+            continue
+        image = _open_rgb(image_path)
+        if image is None:
+            counts["skipped_unreadable"] += 1
+            continue
+        try:
+            with Image.open(mask_path) as m:
+                m.load()
+                if m.size != image.size:
+                    m = m.resize(image.size, Image.NEAREST)
+                mask = np.array(m)
+        except Exception:
+            counts["skipped_unreadable"] += 1
+            continue
+        if mask.ndim == 3:
+            mask = mask[..., 0]
+        width, height = image.size
+        split = mm_split(item_id)
+        for class_id, label in sorted(MM_CLASS_TO_LABEL.items()):
+            box = mask_box(mask, class_id)
+            if box is None:
+                continue
+            if short_side(box) < min_side:
+                counts["skipped_small"] += 1
+                continue
+            row = Row(
+                path=f"crops/{label}/mm-{split}-{stem}-{class_id}.jpg",
+                label=label, source="mm", split=split, group=f"mm:{item_id}", origin="studio",
+            )
+            pending.append(_Pending(row, image_path, widen(box, width, height)))
+    return pending
+
+
+def _write_crops(data: Path, pending: list[_Pending]) -> None:
+    last_path: Path | None = None
+    image: Image.Image | None = None
+    for p in sorted(pending, key=lambda p: str(p.image)):
+        if p.image != last_path:
+            image = _open_rgb(p.image)
+            last_path = p.image
+        assert image is not None
+        crop = image.crop(p.box)
+        scale = LONG_SIDE / max(crop.size)
+        size = (max(1, round(crop.width * scale)), max(1, round(crop.height * scale)))
+        if max(size) != LONG_SIDE:
+            size = (LONG_SIDE if size[0] >= size[1] else size[0], LONG_SIDE if size[1] > size[0] else size[1])
+        crop = crop.resize(size, Image.LANCZOS)
+        out = data / p.row.path
+        out.parent.mkdir(parents=True, exist_ok=True)
+        crop.save(out, "JPEG", quality=JPEG_QUALITY)
+
+
+def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64) -> dict[str, int]:
+    """Rebuild data/crops/ and data/manifest.csv from data/raw/. Returns summary counts."""
+    data = Path(data)
+    data.mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(data / "crops", ignore_errors=True)
+    (data / "manifest.csv").unlink(missing_ok=True)
+
+    counts: Counter = Counter()
+    pending = _collect_df2(data, min_side, counts) + _collect_mm(data, min_side, counts)
+
+    kept_rows = cap_per_label([p.row for p in pending], garment_cap, GARMENT_LABELS)
+    kept = set(kept_rows)
+    counts["dropped_by_cap"] = len(pending) - len(kept_rows)
+    pending = [p for p in pending if p.row in kept]
+
+    _write_crops(data, pending)
+    write_manifest(data / "manifest.csv", [p.row for p in pending])
+    counts["crops"] = len(pending)
+    return {key: counts[key] for key in SUMMARY_KEYS}
+
+
+def _print_table(rows) -> None:
+    table = Counter((r.label, r.split) for r in rows)
+    print(f"{'label':<12}{'train':>8}{'val':>8}")
+    for label in LABELS:
+        print(f"{label:<12}{table[(label, 'train')]:>8}{table[(label, 'val')]:>8}")
+
+
+def main(argv: list[str] | None = None) -> None:
+    from .manifest import read_manifest
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data", type=Path, required=True)
+    parser.add_argument("--garment-cap", type=int, default=8000)
+    args = parser.parse_args(argv)
+    summary = prepare(args.data, garment_cap=args.garment_cap)
+    for key, value in summary.items():
+        print(f"{key}: {value}")
+    _print_table(read_manifest(args.data / "manifest.csv"))
+
+
+if __name__ == "__main__":
+    main()
