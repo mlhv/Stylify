@@ -141,3 +141,25 @@ def test_groups_and_splits(raw):
     assert mm_item_id("MEN-Denim-id_00000080-01_7_additional.jpg") == "id_00000080"
     train_groups = {r.group for r in rows if r.split == "train"}
     assert not train_groups & {r.group for r in rows if r.split == "val"}
+
+
+def test_prepare_skips_crop_that_fails_to_decode_in_phase_two(raw, monkeypatch):
+    import stylify_ml.prepare as prep
+
+    real = prep._open_rgb
+    seen: dict[Path, int] = {}
+
+    def flaky(path):
+        seen[path] = seen.get(path, 0) + 1
+        if path.name == "000003.jpg" and seen[path] > 1:
+            return None
+        return real(path)
+
+    monkeypatch.setattr(prep, "_open_rgb", flaky)
+    summary = prepare(raw)
+    rows = read_manifest(raw / "manifest.csv")
+    assert summary["skipped_unreadable"] == 1
+    assert not any("train-000003-" in r.path for r in rows)
+    assert summary["crops"] == len(rows)
+    on_disk = {p.relative_to(raw).as_posix() for p in (raw / "crops").rglob("*.jpg")}
+    assert on_disk == {r.path for r in rows}

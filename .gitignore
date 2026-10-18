@@ -179,5 +179,6 @@ package-lock.json
 
 # ml pipeline
 ml/.venv/
+ml/data/
 ml/**/__pycache__/
 ml/.pytest_cache/

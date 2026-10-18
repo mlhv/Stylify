@@ -83,6 +83,16 @@ def test_pick_threshold_finds_smallest_qualifying_confidence():
     assert isinstance(pick_threshold(p, t), float)
 
 
+def test_pick_threshold_weights_samples_by_inverse_support():
+    # label 0 has one sample, wrongly predicted as label 1 at 0.7; label 1 has 19 correct at 0.9.
+    # Unweighted precision at t=0.7 is 19/20 = 0.95 (qualifies); weighted it is 0.5, so only 0.9 qualifies.
+    p = np.zeros((20, N))
+    p[0, 1], p[0, 0] = 0.7, 0.3
+    p[1:, 1], p[1:, 0] = 0.9, 0.1
+    t = np.array([0] + [1] * 19)
+    assert pick_threshold(p, t) == pytest.approx(0.9)
+
+
 def test_pick_threshold_returns_one_when_never_reached():
     p = probs_for([1, 1], conf=0.7)
     t = np.array([0, 0])

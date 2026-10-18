@@ -3,6 +3,7 @@ import json
 import pytest
 import torch
 
+from stylify_ml.data import MEAN, STD
 from stylify_ml.export import ParityError, check_parity, export_pte, main, write_metadata
 from stylify_ml.labels import LABELS
 from stylify_ml.models import build_model, load_checkpoint, save_checkpoint
@@ -63,3 +64,19 @@ def test_parity_error_when_output_shapes_differ(tmp_path):
     five = torch.nn.Sequential(*list(tiny.children())[:-1], torch.nn.Linear(4, 5)).eval()
     with pytest.raises(ParityError, match="shape"):
         check_parity(tmp_path / "m.pte", five, torch.rand(1, 3, 224, 224))
+
+
+def test_export_run_rejects_checkpoint_with_different_labels(tmp_path):
+    m = build_model("mobilenet_v3_large", pretrained=False)
+    run = tmp_path / "run"
+    run.mkdir()
+    torch.save({"model": "mobilenet_v3_large", "labels": list(reversed(LABELS)), "state_dict": m.state_dict()},
+               run / "best.pt")
+    with pytest.raises(ValueError, match="labels"):
+        main(["--run", str(run), "--out", str(tmp_path / "out")])
+    assert not (tmp_path / "out").exists()
+
+
+def test_export_uses_the_training_normalisation():
+    import stylify_ml.export as export
+    assert export.MEAN is MEAN and export.STD is STD

@@ -134,23 +134,27 @@ def _collect_mm(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
     return pending
 
 
-def _write_crops(data: Path, pending: list[_Pending]) -> None:
+def _write_crops(data: Path, pending: list[_Pending], counts: Counter) -> list[_Pending]:
+    """Write each crop; return the pending items that were written (undecodable images are left out)."""
+    written: list[_Pending] = []
     last_path: Path | None = None
     image: Image.Image | None = None
     for p in sorted(pending, key=lambda p: str(p.image)):
         if p.image != last_path:
             image = _open_rgb(p.image)
             last_path = p.image
-        assert image is not None
+        if image is None:
+            counts["skipped_unreadable"] += 1
+            continue
         crop = image.crop(p.box)
         scale = LONG_SIDE / max(crop.size)
         size = (max(1, round(crop.width * scale)), max(1, round(crop.height * scale)))
-        if max(size) != LONG_SIDE:
-            size = (LONG_SIDE if size[0] >= size[1] else size[0], LONG_SIDE if size[1] > size[0] else size[1])
         crop = crop.resize(size, Image.LANCZOS)
         out = data / p.row.path
         out.parent.mkdir(parents=True, exist_ok=True)
         crop.save(out, "JPEG", quality=JPEG_QUALITY)
+        written.append(p)
+    return written
 
 
 def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64) -> dict[str, int]:
@@ -168,7 +172,7 @@ def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64) -> dict[str
     counts["dropped_by_cap"] = len(pending) - len(kept_rows)
     pending = [p for p in pending if p.row in kept]
 
-    _write_crops(data, pending)
+    pending = _write_crops(data, pending, counts)
     write_manifest(data / "manifest.csv", [p.row for p in pending])
     counts["crops"] = len(pending)
     return {key: counts[key] for key in SUMMARY_KEYS}

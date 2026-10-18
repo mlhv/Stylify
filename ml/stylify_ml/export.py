@@ -12,13 +12,11 @@ from executorch.backends.xnnpack.partition.xnnpack_partitioner import XnnpackPar
 from executorch.exir import to_edge_transform_and_lower
 from executorch.runtime import Runtime
 
-from stylify_ml.data import ManifestDataset, eval_transform
+from stylify_ml.data import MEAN, STD, ManifestDataset, eval_transform
 from stylify_ml.labels import LABELS
 from stylify_ml.models import build_model, load_checkpoint
 
 INPUT_SIZE = 224
-MEAN = [0.485, 0.456, 0.406]
-STD = [0.229, 0.224, 0.225]
 
 
 class ParityError(Exception):
@@ -99,6 +97,8 @@ def _export_placeholder(out_dir: Path) -> None:
 def _export_run(run: Path, out_dir: Path) -> None:
     run = Path(run)
     model, meta = load_checkpoint(run / "best.pt")
+    if meta["labels"] != list(LABELS):
+        raise ValueError(f"checkpoint labels {meta['labels']} differ from the current LABELS {list(LABELS)}")
     metrics = json.loads((run / "metrics.json").read_text())
     data = Path(json.loads((run / "config.json").read_text())["data"])
     val = ManifestDataset(data, "val", eval_transform())

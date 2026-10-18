@@ -32,6 +32,7 @@ def eval_transform() -> Callable[[Image.Image], torch.Tensor]:
 
 def train_transform() -> Callable[[Image.Image], torch.Tensor]:
     return T.Compose([
+        T.Resize((256, 256)),  # stretch first, as the app does, so the crop sees the whole item
         T.RandomResizedCrop(256, scale=(0.6, 1.0)),
         T.RandomHorizontalFlip(),
         T.ColorJitter(0.2, 0.2, 0.1),

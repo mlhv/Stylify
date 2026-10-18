@@ -1,8 +1,11 @@
 import pillow_heif
+import torch
 import pytest
 from PIL import Image
 
 from stylify_ml.data import (
+    MEAN,
+    STD,
     ManifestDataset,
     balanced_sampler,
     eval_transform,
@@ -66,3 +69,22 @@ def test_load_personal_rejects_unknown_folder(tmp_path):
     (tmp_path / "personal/jewellery").mkdir(parents=True)
     with pytest.raises(ValueError, match="jewellery"):
         load_personal(tmp_path)
+
+
+def test_train_transform_crops_vary_on_elongated_images():
+    # 100 wide x 256 tall: top half red, bottom half blue. A crop stuck on the middle always shows ~50% red;
+    # a real random crop moves the red/blue boundary around.
+    img = Image.new("RGB", (100, 256), (255, 0, 0))
+    img.paste((0, 0, 255), (0, 128, 100, 256))
+    tf = train_transform()
+    mean = torch.tensor(MEAN).view(3, 1, 1)
+    std = torch.tensor(STD).view(3, 1, 1)
+    red_share = []
+    for seed in range(50):
+        torch.manual_seed(seed)
+        out = tf(img) * std + mean
+        red = (out[0] > 0.6) & (out[2] < 0.4)
+        blue = (out[2] > 0.6) & (out[0] < 0.4)
+        red_share.append(red.sum().item() / max(1, (red | blue).sum().item()))
+    assert max(red_share) - min(red_share) > 0.15
+    assert any(r < 0.45 for r in red_share) and any(r > 0.55 for r in red_share)
