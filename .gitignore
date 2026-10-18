@@ -176,3 +176,8 @@ dist
 
 # npm lockfile
 package-lock.json
+
+# ml pipeline
+ml/.venv/
+ml/**/__pycache__/
+ml/.pytest_cache/
