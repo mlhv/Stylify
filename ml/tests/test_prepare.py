@@ -163,3 +163,13 @@ def test_prepare_skips_crop_that_fails_to_decode_in_phase_two(raw, monkeypatch):
     assert summary["crops"] == len(rows)
     on_disk = {p.relative_to(raw).as_posix() for p in (raw / "crops").rglob("*.jpg")}
     assert on_disk == {r.path for r in rows}
+
+
+def test_prepare_skips_sliver_bags_but_keeps_wide_ones(raw):
+    # 70x250 is 0.28 of its height; the fixture bag in the Dresses file is 220x170 and stays
+    _mm(raw / "raw" / "multimodal", "WOMEN-Bags-id_00000200-01_1_front", {12: (100, 100, 170, 350)})
+    summary = prepare(raw)
+    rows = read_manifest(raw / "manifest.csv")
+    assert summary["skipped_sliver"] == 1
+    assert not any("id_00000200" in r.path for r in rows)
+    assert len([r for r in rows if r.label == "bag"]) == 1

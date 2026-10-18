@@ -19,9 +19,10 @@ from .manifest import Row, cap_per_label, mm_item_id, mm_split, write_manifest
 GARMENT_LABELS = {"top", "outerwear", "trousers", "shorts", "skirt", "dress"}
 LONG_SIDE = 256
 JPEG_QUALITY = 90
+BAG_MIN_ASPECT = 0.4  # bag crops narrower than this sit at the frame edge and are mostly arm and torso
 SUMMARY_KEYS = (
     "crops", "skipped_occluded", "skipped_small", "skipped_degenerate",
-    "skipped_unreadable", "skipped_missing", "skipped_unknown_category", "dropped_by_cap",
+    "skipped_sliver", "skipped_unreadable", "skipped_missing", "skipped_unknown_category", "dropped_by_cap",
 )
 
 
@@ -125,6 +126,9 @@ def _collect_mm(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
                 continue
             if short_side(box) < min_side:
                 counts["skipped_small"] += 1
+                continue
+            if label == "bag" and (box[2] - box[0]) / (box[3] - box[1]) < BAG_MIN_ASPECT:
+                counts["skipped_sliver"] += 1
                 continue
             row = Row(
                 path=f"crops/{label}/mm-{split}-{stem}-{class_id}.jpg",
