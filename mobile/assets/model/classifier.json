@@ -1,0 +1,36 @@
+{
+  "labels": [
+    "top",
+    "outerwear",
+    "trousers",
+    "shorts",
+    "skirt",
+    "dress",
+    "shoes",
+    "hat",
+    "bag"
+  ],
+  "inputSize": 224,
+  "resizeMode": "stretch",
+  "normalize": {
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "threshold": 1.0,
+  "model": "placeholder",
+  "run": null,
+  "exportedAt": "2026-10-18T03:02:59.217471+00:00",
+  "scores": {
+    "valBalancedAccuracy": null,
+    "personalTop1": null,
+    "personalTop3": null
+  }
+}
