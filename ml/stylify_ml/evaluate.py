@@ -1,0 +1,106 @@
+"""Score a trained run on val and personal photos, and compare runs side by side."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import tempfile
+from pathlib import Path
+
+import numpy as np
+import torch
+from torch.utils.data import DataLoader
+
+from stylify_ml.data import ManifestDataset, eval_transform, load_image, load_personal
+from stylify_ml.export import export_pte
+from stylify_ml.metrics import pick_threshold, summarise
+from stylify_ml.models import load_checkpoint
+from stylify_ml.train import predict
+
+BATCH_SIZE = 32
+
+
+def _personal_probs(model, data: Path) -> tuple[np.ndarray, np.ndarray] | None:
+    items = load_personal(data)
+    if not items:
+        return None
+    transform = eval_transform()
+    probs = []
+    with torch.no_grad():
+        for start in range(0, len(items), BATCH_SIZE):
+            batch = torch.stack([transform(load_image(p)) for p, _ in items[start:start + BATCH_SIZE]])
+            probs.append(torch.softmax(model(batch), dim=1).numpy())
+    return np.concatenate(probs), np.array([i for _, i in items], dtype=int)
+
+
+def evaluate(run: Path, data: Path) -> dict:
+    """Write and return `run/metrics.json`. Runs on CPU."""
+    run, data = Path(run), Path(data)
+    model, _ = load_checkpoint(run / "best.pt")
+    val = DataLoader(ManifestDataset(data, "val", eval_transform()), batch_size=BATCH_SIZE)
+    val_probs, val_targets = predict(model, val, "cpu")
+    personal = _personal_probs(model, data)
+    metrics = {
+        "val": summarise(val_probs, val_targets),
+        "personal": summarise(*personal) if personal is not None else None,
+        "threshold": pick_threshold(val_probs, val_targets),
+        "pteBytes": None,
+    }
+    (run / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+    return metrics
+
+
+def _pte_bytes(run: Path, metrics: dict) -> int:
+    """Export once to a temp file and cache the size in metrics.json."""
+    if metrics.get("pteBytes") is None:
+        model, _ = load_checkpoint(run / "best.pt")
+        with tempfile.TemporaryDirectory() as tmp:
+            metrics["pteBytes"] = export_pte(model, Path(tmp) / "classifier.pte")
+        (run / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
+    return metrics["pteBytes"]
+
+
+def _fmt(value: float | None) -> str:
+    return "-" if value is None else f"{value:.3f}"
+
+
+def compare(data: Path) -> str:
+    header = ("run", "model", "val bacc", "personal top1", "personal top3", "threshold", ".pte MB")
+    rows = [header]
+    for metrics_path in sorted(Path(data).glob("runs/*/metrics.json")):
+        run = metrics_path.parent
+        metrics = json.loads(metrics_path.read_text())
+        config_path = run / "config.json"
+        model = json.loads(config_path.read_text())["model_name"] if config_path.exists() else "?"
+        personal = metrics["personal"]
+        rows.append((
+            run.name,
+            model,
+            _fmt(metrics["val"]["balanced_accuracy"]),
+            _fmt(personal["top1"] if personal else None),
+            _fmt(personal["top3"] if personal else None),
+            _fmt(metrics["threshold"]),
+            f"{_pte_bytes(run, metrics) / 1e6:.1f}",
+        ))
+    widths = [max(len(r[i]) for r in rows) for i in range(len(header))]
+    return "\n".join("  ".join(cell.ljust(w) for cell, w in zip(r, widths)).rstrip() for r in rows)
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--data", type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--run", type=Path, help="run directory to evaluate")
+    mode.add_argument("--compare", action="store_true", help="print a table of every evaluated run")
+    args = parser.parse_args(argv)
+    if args.compare:
+        print(compare(args.data))
+    else:
+        m = evaluate(args.run, args.data)
+        personal = m["personal"]
+        print(f"val balanced accuracy {m['val']['balanced_accuracy']:.4f}, threshold {m['threshold']:.4f}, "
+              f"personal top-1 {_fmt(personal['top1'] if personal else None)}")
+
+
+if __name__ == "__main__":
+    main()

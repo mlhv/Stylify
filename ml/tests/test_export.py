@@ -56,3 +56,10 @@ def test_checkpoint_round_trip(tmp_path):
     save_checkpoint(tmp_path / "best.pt", m, "mobilenet_v3_large", {"threshold": 0.5})
     loaded, meta = load_checkpoint(tmp_path / "best.pt")
     assert meta["model"] == "mobilenet_v3_large" and meta["threshold"] == 0.5 and meta["labels"] == list(LABELS)
+
+
+def test_parity_error_when_output_shapes_differ(tmp_path):
+    export_pte(tiny, tmp_path / "m.pte")
+    five = torch.nn.Sequential(*list(tiny.children())[:-1], torch.nn.Linear(4, 5)).eval()
+    with pytest.raises(ParityError, match="shape"):
+        check_parity(tmp_path / "m.pte", five, torch.rand(1, 3, 224, 224))

@@ -1,0 +1,114 @@
+import json
+import shutil
+
+import pytest
+from PIL import Image
+
+from stylify_ml import export
+from stylify_ml.evaluate import compare, evaluate
+from stylify_ml.labels import LABELS
+from stylify_ml.manifest import Row, write_manifest
+from stylify_ml.train import train
+
+COLOURS = [(220, 20, 20), (20, 220, 20), (20, 20, 220), (220, 220, 20), (220, 20, 220),
+           (20, 220, 220), (240, 240, 240), (15, 15, 15), (128, 64, 0)]
+
+
+def _fake_data(root):
+    data = root / "data"
+    rows = []
+    for label, colour in zip(LABELS, COLOURS):
+        for split, n in (("train", 2), ("val", 1)):
+            for i in range(n):
+                rel = f"crops/{label}_{split}_{i}.png"
+                (data / "crops").mkdir(parents=True, exist_ok=True)
+                Image.new("RGB", (64, 64), colour).save(data / rel)
+                rows.append(Row(rel, label, "df2", split, f"{label}{i}", "shop"))
+        (data / "personal" / label).mkdir(parents=True)
+        Image.new("RGB", (64, 64), colour).save(data / "personal" / label / "p.jpg")
+    write_manifest(data / "manifest.csv", rows)
+    return data
+
+
+@pytest.fixture(scope="module")
+def tiny_run(tmp_path_factory):
+    data = _fake_data(tmp_path_factory.mktemp("e2e"))
+    run = train(data, "mobilenet_v3_large", head_epochs=1, full_epochs=1, batch_size=4,
+                pretrained=False, device="cpu", run_id="t1", workers=0)
+    return data, run
+
+
+def test_train_then_evaluate_then_compare(tiny_run):
+    data, run = tiny_run
+    assert {"config.json", "epochs.jsonl", "best.pt"} <= {p.name for p in run.iterdir()}
+    epochs = [json.loads(line) for line in (run / "epochs.jsonl").read_text().splitlines()]
+    assert len(epochs) == 2
+    assert [(e["phase"], e["epoch"]) for e in epochs] == [("head", 1), ("full", 1)]
+    config = json.loads((run / "config.json").read_text())
+    assert config["data"] == str(data) and config["run_id"] == "t1" and config["device"] == "cpu"
+    m = evaluate(run, data)
+    assert set(m) == {"val", "personal", "threshold", "pteBytes"}
+    assert 0.0 <= m["threshold"] <= 1.0 and m["personal"] is not None
+    assert m["val"]["n"] == 9 and m["personal"]["n"] == 9
+    table = compare(data)
+    assert "t1" in table
+    cached = json.loads((run / "metrics.json").read_text())["pteBytes"]
+    assert isinstance(cached, int) and cached > 0
+    assert compare(data) == table
+
+
+def test_train_refuses_an_existing_run(tiny_run):
+    data, _ = tiny_run
+    with pytest.raises(FileExistsError):
+        train(data, "mobilenet_v3_large", head_epochs=1, full_epochs=1, pretrained=False,
+              device="cpu", run_id="t1", workers=0)
+
+
+def test_evaluate_without_personal(tiny_run, tmp_path):
+    data, run = tiny_run
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy, ignore=shutil.ignore_patterns("personal"))  # keeps the shared run untouched
+    m = evaluate(copy / "runs" / run.name, copy)
+    assert m["personal"] is None
+    assert "-" in compare(copy).splitlines()[1].split()
+
+
+def test_export_run_writes_both_files(tiny_run, tmp_path):
+    data, run = tiny_run
+    if not (run / "metrics.json").exists():
+        evaluate(run, data)
+    metrics = json.loads((run / "metrics.json").read_text())
+    out = tmp_path / "out"
+    export.main(["--run", str(run), "--out", str(out)])
+    meta = json.loads((out / "classifier.json").read_text())
+    assert (out / "classifier.pte").stat().st_size > 0
+    assert meta["run"] == "t1" and meta["model"] == "mobilenet_v3_large"
+    assert meta["threshold"] == metrics["threshold"]
+    assert meta["scores"] == {"valBalancedAccuracy": metrics["val"]["balanced_accuracy"],
+                              "personalTop1": metrics["personal"]["top1"],
+                              "personalTop3": metrics["personal"]["top3"]}
+
+
+def test_export_run_writes_nothing_when_parity_fails(tiny_run, tmp_path, monkeypatch):
+    data, run = tiny_run
+    if not (run / "metrics.json").exists():
+        evaluate(run, data)
+
+    def fail(*args, **kwargs):
+        raise export.ParityError("forced")
+
+    monkeypatch.setattr(export, "check_parity", fail)
+    out = tmp_path / "out"
+    with pytest.raises(export.ParityError):
+        export.main(["--run", str(run), "--out", str(out)])
+    assert not (out / "classifier.json").exists() and not (out / "classifier.pte").exists()
+
+
+def test_placeholder_writes_nothing_when_parity_fails(tmp_path, monkeypatch):
+    def fail(*args, **kwargs):
+        raise export.ParityError("forced")
+
+    monkeypatch.setattr(export, "check_parity", fail)
+    with pytest.raises(export.ParityError):
+        export.main(["--placeholder", "--out", str(tmp_path)])
+    assert not (tmp_path / "classifier.json").exists() and not (tmp_path / "classifier.pte").exists()
