@@ -1,12 +1,14 @@
+import io
 import json
+import re
 from pathlib import Path
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from stylify_ml.manifest import mm_item_id, read_manifest
-from stylify_ml.prepare import prepare
+from stylify_ml.manifest import mm_item_id, mm_split, read_manifest
+from stylify_ml.prepare import dhash, prepare
 
 W, H = 300, 400
 
@@ -173,3 +175,106 @@ def test_prepare_skips_sliver_bags_but_keeps_wide_ones(raw):
     assert summary["skipped_sliver"] == 1
     assert not any("id_00000200" in r.path for r in rows)
     assert len([r for r in rows if r.label == "bag"]) == 1
+
+
+def _pattern(path: Path, kind: str, size=(200, 160)) -> None:
+    """A two-tone image; a solid one has an all-zero dHash, so the tests need real structure."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    w, h = size
+    arr = np.zeros((h, w, 3), dtype=np.uint8)
+    if kind == "lr":
+        arr[:, : w // 2] = 250
+    elif kind == "tb":
+        arr[: h // 2, :] = 250
+    elif kind == "grad":
+        arr[:] = np.linspace(0, 255, w, dtype=np.uint8)[None, :, None]
+    img = Image.fromarray(arr)
+    img.save(path, "PNG" if path.suffix.lower() == ".png" else "JPEG", quality=95)
+
+
+def _noise(path: Path, seed: int) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(seed)
+    small = rng.integers(0, 256, size=(8, 9, 3), dtype=np.uint8)
+    Image.fromarray(small).resize((180, 160), Image.NEAREST).save(path, "JPEG", quality=95)
+
+
+def _web_rows(raw: Path):
+    return [r for r in read_manifest(raw / "manifest.csv") if r.source == "web"]
+
+
+def test_web_shoes_dedupe_small_and_row_fields(raw):
+    shoes = raw / "raw" / "shoes"
+    _pattern(shoes / "shoenet" / "0" / "1.jpg", "lr")
+    _pattern(shoes / "shoenet" / "1" / "2.jpg", "tb")
+    _pattern(shoes / "jhovanni" / "train" / "boot" / "copy.png", "lr")  # same picture, re-saved
+    _pattern(shoes / "jhovanni" / "train" / "boot" / "tiny.jpg", "lr", size=(40, 40))
+    (shoes / "shoenet" / "0" / ".hidden.jpg").write_bytes(b"x")
+    (shoes / "shoenet" / "0" / "notes.txt").write_text("x")
+    summary = prepare(raw)
+    rows = _web_rows(raw)
+    assert summary["skipped_duplicate"] == 1
+    assert summary["skipped_small"] == 2  # the existing 40x40 df2 box and the tiny web image
+    assert len(rows) == 2
+    for r in rows:
+        assert r.source == r.origin == "web" and r.label == "shoes"
+        assert re.fullmatch(r"web:[0-9a-f]{16}", r.group)
+        assert r.path == f"crops/shoes/web-{r.split}-{r.group.removeprefix('web:')}.jpg"
+        assert r.split == mm_split(r.group.removeprefix("web:"))
+        assert max(Image.open(raw / r.path).size) == 256
+
+
+def test_no_raw_shoes_dir_gives_no_web_rows(raw):
+    summary = prepare(raw)
+    assert summary["skipped_duplicate"] == 0
+    assert _web_rows(raw) == []
+
+
+def test_shoe_cap_applies_per_source_to_train_only(raw):
+    mm = raw / "raw" / "multimodal"
+    ids = [f"id_{n:08d}" for n in range(300, 330)]
+    for i in ids:
+        _mm(mm, f"WOMEN-Shoes-{i}-01_1_front", {11: (40, 320, 200, 390)})
+    for n in range(30):
+        _noise(raw / "raw" / "shoes" / "shoenet" / "0" / f"{n}.jpg", n)
+    uncapped = prepare(raw, shoe_cap=10_000)
+    before = read_manifest(raw / "manifest.csv")
+    for src in ("mm", "web"):
+        shoes = [r for r in before if r.source == src and r.label == "shoes"]
+        assert len([r for r in shoes if r.split == "train"]) >= 2
+        assert any(r.split == "val" for r in shoes)
+    assert uncapped["dropped_by_cap"] == 0
+
+    summary = prepare(raw, shoe_cap=1)
+    after = read_manifest(raw / "manifest.csv")
+    for src in ("mm", "web"):
+        shoes = [r for r in after if r.source == src and r.label == "shoes"]
+        assert len([r for r in shoes if r.split == "train"]) == 1
+        val_before = {r for r in before if r.source == src and r.label == "shoes" and r.split == "val"}
+        assert val_before <= set(after)
+    assert summary["dropped_by_cap"] > 0
+    on_disk = {p.relative_to(raw).as_posix() for p in (raw / "crops").rglob("*.jpg")}
+    assert on_disk == {r.path for r in after}
+
+
+def test_web_shoes_do_not_change_garment_selection(raw):
+    prepare(raw, garment_cap=1)
+    without = {r for r in read_manifest(raw / "manifest.csv") if r.label != "shoes"}
+    for n in range(10):
+        _noise(raw / "raw" / "shoes" / "shoenet" / "0" / f"{n}.jpg", n)
+    prepare(raw, garment_cap=1)
+    with_web = {r for r in read_manifest(raw / "manifest.csv") if r.label != "shoes"}
+    assert without == with_web and without
+
+
+def test_dhash_is_stable_under_resize_and_reencode_but_differs_between_images():
+    img = Image.fromarray(np.tile(np.linspace(0, 255, 200, dtype=np.uint8), (160, 1))).convert("RGB")
+    other = img.transpose(Image.FLIP_LEFT_RIGHT)
+    smaller = img.resize((100, 80))
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=70)
+    reencoded = Image.open(io.BytesIO(buf.getvalue())).convert("RGB")
+    h = dhash(img)
+    assert re.fullmatch(r"[0-9a-f]{16}", h)
+    assert dhash(smaller) == h and dhash(reencoded) == h
+    assert dhash(other) != h

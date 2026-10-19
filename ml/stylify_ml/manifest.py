@@ -18,10 +18,10 @@ _ITEM_ID = re.compile(r"id_\d{8}")
 class Row:
     path: str
     label: str
-    source: str   # "df2" | "mm"
+    source: str   # "df2" | "mm" | "web"
     split: str    # "train" | "val"
     group: str
-    origin: str   # "shop" | "user" | "studio"
+    origin: str   # "shop" | "user" | "studio" | "web"
 
 
 def write_manifest(path: Path, rows: list[Row]) -> None:

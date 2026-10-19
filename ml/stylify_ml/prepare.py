@@ -1,4 +1,4 @@
-"""Build the crop cache and manifest.csv from raw DeepFashion2 and DeepFashion-MultiModal data."""
+"""Build the crop cache and manifest.csv from raw DeepFashion2, DeepFashion-MultiModal and web shoe photos."""
 
 from __future__ import annotations
 
@@ -19,10 +19,11 @@ from .manifest import Row, cap_per_label, mm_item_id, mm_split, write_manifest
 GARMENT_LABELS = {"top", "outerwear", "trousers", "shorts", "skirt", "dress"}
 LONG_SIDE = 256
 JPEG_QUALITY = 90
+WEB_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 BAG_MIN_ASPECT = 0.4  # bag crops narrower than this sit at the frame edge and are mostly arm and torso
 SUMMARY_KEYS = (
     "crops", "skipped_occluded", "skipped_small", "skipped_degenerate",
-    "skipped_sliver", "skipped_unreadable", "skipped_missing", "skipped_unknown_category", "dropped_by_cap",
+    "skipped_sliver", "skipped_duplicate", "skipped_unreadable", "skipped_missing", "skipped_unknown_category", "dropped_by_cap",
 )
 
 
@@ -138,6 +139,42 @@ def _collect_mm(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
     return pending
 
 
+def dhash(image: Image.Image) -> str:
+    """64-bit difference hash as 16 hex chars: stable under resizing and re-encoding."""
+    small = np.asarray(image.convert("L").resize((9, 8), Image.BILINEAR), dtype=np.int16)
+    bits = (small[:, :-1] > small[:, 1:]).flatten()
+    return f"{int(''.join('1' if b else '0' for b in bits), 2):016x}"
+
+
+def _collect_web_shoes(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
+    pending: list[_Pending] = []
+    seen: set[str] = set()
+    base = data / "raw" / "shoes"
+    for path in sorted(p for p in base.rglob("*") if p.is_file()):
+        if path.suffix.lower() not in WEB_SUFFIXES or path.name.startswith("."):
+            continue
+        image = _open_rgb(path)
+        if image is None:
+            counts["skipped_unreadable"] += 1
+            continue
+        width, height = image.size
+        if min(width, height) < min_side:
+            counts["skipped_small"] += 1
+            continue
+        digest = dhash(image)
+        if digest in seen:
+            counts["skipped_duplicate"] += 1
+            continue
+        seen.add(digest)
+        split = mm_split(digest)
+        row = Row(
+            path=f"crops/shoes/web-{split}-{digest}.jpg",
+            label="shoes", source="web", split=split, group=f"web:{digest}", origin="web",
+        )
+        pending.append(_Pending(row, path, (0, 0, width, height)))  # each image is already one shoe or one pair
+    return pending
+
+
 def _write_crops(data: Path, pending: list[_Pending], counts: Counter) -> list[_Pending]:
     """Write each crop; return the pending items that were written (undecodable images are left out)."""
     written: list[_Pending] = []
@@ -161,7 +198,7 @@ def _write_crops(data: Path, pending: list[_Pending], counts: Counter) -> list[_
     return written
 
 
-def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64) -> dict[str, int]:
+def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64, shoe_cap: int = 4000) -> dict[str, int]:
     """Rebuild data/crops/ and data/manifest.csv from data/raw/. Returns summary counts."""
     data = Path(data)
     data.mkdir(parents=True, exist_ok=True)
@@ -170,8 +207,14 @@ def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64) -> dict[str
 
     counts: Counter = Counter()
     pending = _collect_df2(data, min_side, counts) + _collect_mm(data, min_side, counts)
+    pending += _collect_web_shoes(data, min_side, counts)  # last, so the garment cap draws the same rows as before
 
     kept_rows = cap_per_label([p.row for p in pending], garment_cap, GARMENT_LABELS)
+    # shoes are capped per source so on-foot MultiModal crops and web photos each fill half of the budget
+    for source in ("mm", "web"):
+        from_source = [r for r in kept_rows if r.source == source and r.label == "shoes"]
+        dropped = set(from_source) - set(cap_per_label(from_source, shoe_cap, {"shoes"}))
+        kept_rows = [r for r in kept_rows if r not in dropped]
     kept = set(kept_rows)
     counts["dropped_by_cap"] = len(pending) - len(kept_rows)
     pending = [p for p in pending if p.row in kept]
@@ -195,8 +238,9 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--garment-cap", type=int, default=8000)
+    parser.add_argument("--shoe-cap", type=int, default=4000)
     args = parser.parse_args(argv)
-    summary = prepare(args.data, garment_cap=args.garment_cap)
+    summary = prepare(args.data, garment_cap=args.garment_cap, shoe_cap=args.shoe_cap)
     for key, value in summary.items():
         print(f"{key}: {value}")
     _print_table(read_manifest(args.data / "manifest.csv"))
