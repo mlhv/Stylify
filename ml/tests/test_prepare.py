@@ -214,6 +214,7 @@ def test_web_shoes_dedupe_small_and_row_fields(raw):
     summary = prepare(raw)
     rows = _web_rows(raw)
     assert summary["skipped_duplicate"] == 1
+    assert summary["skipped_unreadable"] == 0  # .hidden.jpg and notes.txt are skipped before opening
     assert summary["skipped_small"] == 2  # the existing 40x40 df2 box and the tiny web image
     assert len(rows) == 2
     for r in rows:
@@ -267,14 +268,36 @@ def test_web_shoes_do_not_change_garment_selection(raw):
     assert without == with_web and without
 
 
+def _structured(size=(180, 160)) -> Image.Image:
+    """Each row of the 9x8 grid is a ramp or a V, giving the hash bits ff 00 f0 0f twice over."""
+    rows = [
+        [8, 7, 6, 5, 4, 3, 2, 1, 0],  # strictly falling: 11111111
+        [0, 1, 2, 3, 4, 5, 6, 7, 8],  # strictly rising: 00000000
+        [4, 3, 2, 1, 0, 1, 2, 3, 4],  # falls then rises: 11110000
+        [0, 1, 2, 3, 4, 3, 2, 1, 0],  # rises then falls: 00001111
+    ] * 2
+    grid = np.array(rows, dtype=np.uint8) * 25 + 20
+    small = Image.fromarray(grid).convert("RGB")
+    return small.resize(size, Image.NEAREST)
+
+
 def test_dhash_is_stable_under_resize_and_reencode_but_differs_between_images():
-    img = Image.fromarray(np.tile(np.linspace(0, 255, 200, dtype=np.uint8), (160, 1))).convert("RGB")
-    other = img.transpose(Image.FLIP_LEFT_RIGHT)
-    smaller = img.resize((100, 80))
+    img = _structured()
+    h = dhash(img)
+    assert h == "ff00f00fff00f00f"  # worked by hand from the definition: left pixel > right pixel, row by row
+    assert dhash(img.resize((90, 80))) == h
     buf = io.BytesIO()
     img.save(buf, "JPEG", quality=70)
-    reencoded = Image.open(io.BytesIO(buf.getvalue())).convert("RGB")
-    h = dhash(img)
-    assert re.fullmatch(r"[0-9a-f]{16}", h)
-    assert dhash(smaller) == h and dhash(reencoded) == h
-    assert dhash(other) != h
+    assert dhash(Image.open(io.BytesIO(buf.getvalue())).convert("RGB")) == h
+    assert dhash(img.transpose(Image.FLIP_LEFT_RIGHT)) != h
+
+
+def test_dedupe_keeps_first_image_in_sorted_path_order(raw):
+    shoes = raw / "raw" / "shoes"
+    for folder, size in (("b", (180, 240)), ("a", (180, 160))):  # same hash, different shape
+        (shoes / folder).mkdir(parents=True)
+        _structured(size).save(shoes / folder / "x.jpg", quality=95)
+    summary = prepare(raw)
+    (row,) = _web_rows(raw)
+    assert summary["skipped_duplicate"] == 1
+    assert Image.open(raw / row.path).size == (256, 228)  # a/ is 180x160; b/ would give 171x256
