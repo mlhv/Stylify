@@ -204,7 +204,7 @@ def _web_rows(raw: Path):
 
 
 def test_web_shoes_dedupe_small_and_row_fields(raw):
-    shoes = raw / "raw" / "shoes"
+    shoes = raw / "raw" / "web" / "shoes"
     _pattern(shoes / "shoenet" / "0" / "1.jpg", "lr")
     _pattern(shoes / "shoenet" / "1" / "2.jpg", "tb")
     _pattern(shoes / "jhovanni" / "train" / "boot" / "copy.png", "lr")  # same picture, re-saved
@@ -225,20 +225,20 @@ def test_web_shoes_dedupe_small_and_row_fields(raw):
         assert max(Image.open(raw / r.path).size) == 256
 
 
-def test_no_raw_shoes_dir_gives_no_web_rows(raw):
+def test_no_raw_web_dir_gives_no_web_rows(raw):
     summary = prepare(raw)
     assert summary["skipped_duplicate"] == 0
     assert _web_rows(raw) == []
 
 
-def test_shoe_cap_applies_per_source_to_train_only(raw):
+def test_accessory_cap_applies_per_source_to_train_only(raw):
     mm = raw / "raw" / "multimodal"
     ids = [f"id_{n:08d}" for n in range(300, 330)]
     for i in ids:
         _mm(mm, f"WOMEN-Shoes-{i}-01_1_front", {11: (40, 320, 200, 390)})
     for n in range(30):
-        _noise(raw / "raw" / "shoes" / "shoenet" / "0" / f"{n}.jpg", n)
-    uncapped = prepare(raw, shoe_cap=10_000)
+        _noise(raw / "raw" / "web" / "shoes" / "shoenet" / "0" / f"{n}.jpg", n)
+    uncapped = prepare(raw, accessory_cap=10_000)
     before = read_manifest(raw / "manifest.csv")
     for src in ("mm", "web"):
         shoes = [r for r in before if r.source == src and r.label == "shoes"]
@@ -246,7 +246,7 @@ def test_shoe_cap_applies_per_source_to_train_only(raw):
         assert any(r.split == "val" for r in shoes)
     assert uncapped["dropped_by_cap"] == 0
 
-    summary = prepare(raw, shoe_cap=1)
+    summary = prepare(raw, accessory_cap=1)
     after = read_manifest(raw / "manifest.csv")
     for src in ("mm", "web"):
         shoes = [r for r in after if r.source == src and r.label == "shoes"]
@@ -262,7 +262,7 @@ def test_web_shoes_do_not_change_garment_selection(raw):
     prepare(raw, garment_cap=1)
     without = {r for r in read_manifest(raw / "manifest.csv") if r.label != "shoes"}
     for n in range(10):
-        _noise(raw / "raw" / "shoes" / "shoenet" / "0" / f"{n}.jpg", n)
+        _noise(raw / "raw" / "web" / "shoes" / "shoenet" / "0" / f"{n}.jpg", n)
     prepare(raw, garment_cap=1)
     with_web = {r for r in read_manifest(raw / "manifest.csv") if r.label != "shoes"}
     assert without == with_web and without
@@ -293,7 +293,7 @@ def test_dhash_is_stable_under_resize_and_reencode_but_differs_between_images():
 
 
 def test_dedupe_keeps_first_image_in_sorted_path_order(raw):
-    shoes = raw / "raw" / "shoes"
+    shoes = raw / "raw" / "web" / "shoes"
     for folder, size in (("b", (180, 240)), ("a", (180, 160))):  # same hash, different shape
         (shoes / folder).mkdir(parents=True)
         _structured(size).save(shoes / folder / "x.jpg", quality=95)
@@ -301,3 +301,71 @@ def test_dedupe_keeps_first_image_in_sorted_path_order(raw):
     (row,) = _web_rows(raw)
     assert summary["skipped_duplicate"] == 1
     assert Image.open(raw / row.path).size == (256, 228)  # a/ is 180x160; b/ would give 171x256
+
+
+def test_web_hat_and_bag_rows_use_their_folder_label(raw):
+    web = raw / "raw" / "web"
+    _pattern(web / "hat" / "myntra" / "cap" / "1.jpg", "lr")
+    _pattern(web / "bag" / "myntra" / "tote" / "2.jpg", "tb")
+    prepare(raw)
+    rows = {r.label: r for r in _web_rows(raw)}
+    assert set(rows) == {"hat", "bag"}
+    for label, r in rows.items():
+        assert r.path == f"crops/{label}/web-{r.split}-{r.group.removeprefix('web:')}.jpg"
+        assert r.source == r.origin == "web"
+        assert (raw / r.path).exists()
+
+
+def test_unknown_web_label_folder_raises(raw):
+    _pattern(raw / "raw" / "web" / "jewellery" / "x" / "a.jpg", "lr")
+    with pytest.raises(ValueError, match="jewellery"):
+        prepare(raw)
+
+
+def test_hidden_web_folder_is_skipped(raw):
+    _pattern(raw / "raw" / "web" / ".cache" / "x" / "a.jpg", "lr")
+    prepare(raw)
+    assert _web_rows(raw) == []
+
+
+def test_accessory_cap_applies_per_label_and_source(raw):
+    mm = raw / "raw" / "multimodal"
+    for n in range(300, 330):
+        _mm(mm, f"WOMEN-Hats-id_{n:08d}-01_1_front", {7: (80, 10, 220, 90)})
+    for n in range(30):
+        _noise(raw / "raw" / "web" / "hat" / "myntra" / "cap" / f"{n}.jpg", n)
+    prepare(raw, accessory_cap=10_000)
+    before = read_manifest(raw / "manifest.csv")
+    for src in ("mm", "web"):
+        hats = [r for r in before if r.source == src and r.label == "hat"]
+        assert len([r for r in hats if r.split == "train"]) >= 2
+    prepare(raw, accessory_cap=1)
+    after = read_manifest(raw / "manifest.csv")
+    for src in ("mm", "web"):
+        hats = [r for r in after if r.source == src and r.label == "hat"]
+        assert len([r for r in hats if r.split == "train"]) == 1
+        val_before = {r for r in before if r.source == src and r.label == "hat" and r.split == "val"}
+        assert val_before <= set(after)
+
+
+def test_identical_image_under_bag_and_hat_is_kept_once_under_bag(raw):
+    web = raw / "raw" / "web"
+    _pattern(web / "hat" / "s" / "a.jpg", "lr")
+    _pattern(web / "bag" / "s" / "a.jpg", "lr")
+    summary = prepare(raw)
+    (row,) = _web_rows(raw)
+    assert row.label == "bag"
+    assert summary["skipped_duplicate"] == 1
+
+
+def test_shoe_cap_draws_the_same_rows_as_the_old_per_source_cap(raw):
+    from stylify_ml.manifest import cap_per_label
+
+    for n in range(30):
+        _noise(raw / "raw" / "web" / "shoes" / "shoenet" / "0" / f"{n}.jpg", n)
+    prepare(raw, accessory_cap=10_000)
+    web_shoes = [r for r in read_manifest(raw / "manifest.csv") if r.source == "web" and r.label == "shoes"]
+    expected = set(cap_per_label(web_shoes, 3, {"shoes"}))  # the pre-change call, on the same candidates
+    prepare(raw, accessory_cap=3)
+    got = {r for r in read_manifest(raw / "manifest.csv") if r.source == "web" and r.label == "shoes"}
+    assert got == expected

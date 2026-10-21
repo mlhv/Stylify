@@ -83,6 +83,10 @@ Both are licensed for non-commercial research only and may not be redistributed.
 - Added because every MultiModal shoe is a pair worn by a model and seen from the front, and Minh's side-on photos of a single shoe failed. Each web image is one shoe or one pair, often on its own.
 - Both are web-scraped, so, like DeepFashion, they stay in `~/stylify-data` and are never committed. The two overlap, so `prepare.py` removes duplicates across both.
 
+**Web hat and bag photos** (added 2026-10-21): the Myntra product catalogue (https://huggingface.co/datasets/benitomartin/fashion-product-images-small-384x512, bag and cap article types) and the Kaggle Headgear dataset (https://www.kaggle.com/datasets/gpiosenka/headgear-image-classification, CC0, wearable-hat classes only: baseball cap, beret, fedora, bowler, boater, pork pie, deerstalker, ascot cap, top hat).
+
+- Added because every MultiModal hat and bag is a crop of an item on a model, and the owner's cap was called `top` at 0.85 to 0.88 confidence, above both thresholds. Same reasoning and same handling as the web shoes.
+
 ## Labels
 
 Nine labels, in this output order:
@@ -95,9 +99,9 @@ Nine labels, in this output order:
 | 3 | `shorts` | Shorts | shorts | (not used) |
 | 4 | `skirt` | Skirt | skirt | (not used) |
 | 5 | `dress` | Dress | short sleeve dress, long sleeve dress, vest dress, sling dress | (not used) |
-| 6 | `shoes` | Shoes | (none) | footwear, plus web shoe photos |
-| 7 | `hat` | Hat | (none) | headwear |
-| 8 | `bag` | Bag | (none) | bag |
+| 6 | `shoes` | Shoes | (none) | footwear, plus web product photos |
+| 7 | `hat` | Hat | (none) | headwear, plus web product photos |
+| 8 | `bag` | Bag | (none) | bag, plus web product photos |
 
 Garments come from DeepFashion2 only: its customer photos are closer to phone photos, and MultiModal's `pants` mixes trousers and shorts.
 
@@ -113,7 +117,7 @@ Garments come from DeepFashion2 only: its customer photos are closer to phone ph
 ~/stylify-data/
   raw/deepfashion2/{train,validation}/   unzipped, deleted after prepare
   raw/multimodal/images/ and parsing/    MultiModal images and masks
-  raw/shoes/<source>/...                 web shoe photos (shoenet, jhovanni)
+  raw/web/<label>/<source>/...           web photos: shoes (shoenet, jhovanni), hat and bag (myntra, headgear)
   crops/<label>/<id>.jpg                 the crop cache
   manifest.csv
   personal/<label>/*.jpg                 Minh's own photos, never trained on
@@ -131,11 +135,11 @@ Garments come from DeepFashion2 only: its customer photos are closer to phone ph
 
 - DeepFashion2: one crop per annotated item, mapped through the label table. Items with occlusion 3 are skipped.
 - MultiModal: for footwear, headwear and bag, the box is the bounding box of that class's pixels in the parsing mask. Boxes under 64 px on the short side are skipped.
-- Web shoes: every image under `raw/shoes/` (jpg, jpeg, png, webp; sorted path order) is one crop of the whole image, with no widening. Images under 64 px on the short side are skipped. Duplicates across both datasets are removed by a 64-bit difference hash (the first image in path order is kept). The split is 85/15 by that hash, and `group` is `web:<hash>`.
+- Web photos: the folder under `raw/web/` names the label (it must be one of the nine, or `prepare.py` stops with an error; names starting with `.` are skipped). Every image under `raw/web/<label>/` (jpg, jpeg, png, webp; sorted path order) is one crop of the whole image, with no widening. Images under 64 px on the short side are skipped. Duplicates across all of `raw/web/`, whatever the label, are removed by a 64-bit difference hash (the first image in path order is kept). The split is 85/15 by that hash, and `group` is `web:<hash>`.
 - Every DeepFashion2 and MultiModal box is widened by 10% on each side (clamped to the image), cropped, resized so the long side is 256 px, and saved as JPEG quality 90. Web shoe images are used whole, then resized and saved the same way.
 - `manifest.csv` columns: `path, label, source (df2|mm|web), split (train|val), group (item ID), origin (shop|user|studio|web)`.
 - Splits: DeepFashion2 keeps its own train and validation split. Its `pair_id` numbering is separate in each split, so `group` is `df2:<split>:<pair_id>`. MultiModal is split 85/15 by item ID, parsed from the file name (for example `id_00000080`; confirm the format once the images are downloaded), with `group` `mm:<item ID>`, so one product's photos never appear on both sides.
-- Balance: at most 8,000 training crops per garment label, chosen at random with a fixed seed. Validation is not capped. Shoes are capped per source: at most 4,000 training crops from MultiModal and 4,000 from web photos, so about half the shoes are on feet and half are not.
+- Balance: at most 8,000 training crops per garment label, chosen at random with a fixed seed. Validation is not capped. Shoes, hats and bags are capped per (label, source): at most 4,000 training crops from MultiModal and 4,000 from web photos for each, so about half the shoes are on feet and half are not.
 - The script prints counts per label, source and split.
 
 ### `train.py`
