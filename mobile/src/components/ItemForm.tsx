@@ -7,6 +7,8 @@ import { ActivityIndicator, Keyboard, Pressable, ScrollView, Text, TextInput, Vi
 
 import { errorMessage } from '@/components/ErrorState'
 import { pickPhoto, type PhotoSource } from '@/lib/photo'
+import { decide } from '@/lib/suggestion'
+import { useTypeSuggestion } from '@/lib/useTypeSuggestion'
 
 export type ItemFields = { name: string; type: string; size: string; color: string }
 
@@ -91,11 +93,24 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
     },
   })
 
+  // Type suggestions. onResult reads the field when the classifier finishes, so a type typed in the meantime is kept.
+  const [chips, setChips] = useState<string[]>([])
+  const lastPrefill = useRef<string | null>(null)
+  const { pending, start } = useTypeSuggestion((result) => {
+    const d = decide(result.predictions, result.threshold, form.getFieldValue('type'), lastPrefill.current)
+    if (d.prefill) {
+      form.setFieldValue('type', d.prefill)
+      lastPrefill.current = d.prefill
+    }
+    setChips(d.chips)
+  })
+
   async function choose(source: PhotoSource) {
     try {
       const uri = await pickPhoto(source)
       if (uri) {
         setPhotoUri(uri)
+        start(uri)
         setError(null)
       }
     } catch (e) {
@@ -161,6 +176,27 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
                 />
                 {field.state.meta.isTouched && field.state.meta.errors.length ? (
                   <Text className="text-sm text-red-600">{field.state.meta.errors.join(', ')}</Text>
+                ) : null}
+                {name === 'type' ? (
+                  pending ? (
+                    <Text className="text-sm text-neutral-500">Identifying…</Text>
+                  ) : chips.length ? (
+                    <View className="flex-row flex-wrap gap-2">
+                      {chips.map((chip) => {
+                        const selected = field.state.value === chip
+                        return (
+                          <Pressable
+                            key={chip}
+                            className={`rounded-full px-3 py-1 ${selected ? 'bg-neutral-900' : 'bg-neutral-200'}`}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Set type to ${chip}`}
+                            onPress={() => form.setFieldValue('type', chip)}>
+                            <Text className={selected ? 'text-white' : undefined}>{chip}</Text>
+                          </Pressable>
+                        )
+                      })}
+                    </View>
+                  ) : null
                 ) : null}
               </View>
             )}
