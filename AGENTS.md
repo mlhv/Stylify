@@ -68,6 +68,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **Routes that return `c.notFound()` lose their response type in the RPC client.** `frontend/src/lib/api.ts` asserts those results to the `Item` type; keep that in mind when changing what `GET`/`PUT /api/wardrobe/:id` return.
 - **Server and web installs need `--omit=peer` as well as `--filter`.** The server's Kinde SDK has an optional peer, `expo-secure-store`, which `mobile/` puts in the lockfile. Without `--omit=peer`, `--filter server` installs Expo and React Native (about 700 packages instead of about 100). The Dockerfile and both deploy workflows use it. After changing any of them, check `docker run --rm <image> sh -c 'ls node_modules | wc -l'` prints about 57.
 - **API 404s reach clients as 404 since 2026-10-13.** Before that, CloudFront turned them into `200 text/html`. `mobile/src/lib/unmaskNotFound.ts` is kept as a guard and is a no-op while that holds.
+- **`react-native-worklets` 0.10.4 and `react-native-reanimated` 4.5.5 are deliberately newer than Expo SDK 55's expected versions** (`react-native-executorch` needs them); do not run `expo install --fix` on them.
 - **Never print or commit `.env` values.**
 - **Datasets, crops, runs and personal photos never go in the repo** (licences forbid redistribution). They live in `~/stylify-data/`; only `mobile/assets/model/` is committed. See `docs/ml.md`.
 

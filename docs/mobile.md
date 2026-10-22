@@ -34,6 +34,12 @@ bunx expo run:ios --device "<name or UDID>"
 - **The build expires after 7 days.** Run the install command again to renew it.
 - **The phone must reach Metro on the Mac:** same Wi-Fi, and Local Network allowed for Stylify (Settings → Privacy & Security → Local Network). Otherwise the app shows a red "No script URL provided" banner. The Mac's address is baked into the build, so a changed network needs a rebuild. Networks that block device-to-device traffic (common on university and office Wi-Fi) do not work; a personal hotspot does.
 
+### ExecuTorch and the model
+
+- `mobile/package.json` has a `postinstall` (`scripts/executorch-libs.cjs`) that runs `react-native-executorch`'s `download-libs.js` with the `"react-native-executorch"` block (`features: ["classification"]`) in that file. Bun does not run dependencies' postinstalls, so this is how the prebuilt ExecuTorch binaries (about 175 MB in `node_modules/react-native-executorch/third-party/`) get downloaded. The filtered server and web installs do not run it.
+- The classifier lives in `mobile/assets/model/` (`classifier.pte`, `classifier.json`); Metro treats `.pte` as an asset.
+- `react-native-worklets` and `react-native-reanimated` are newer than SDK 55 expects; see `AGENTS.md`.
+
 ### Why SDK 55
 
 The owner's Mac runs macOS Sequoia with Xcode 26.3 (Swift 6.2.4), the newest it supports. SDK 56 and later fail to compile `expo-modules-jsi` there (expo/expo #49941 and #50067). Upgrading the SDK needs a macOS and Xcode upgrade first.
