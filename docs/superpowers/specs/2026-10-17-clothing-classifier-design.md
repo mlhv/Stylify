@@ -162,8 +162,9 @@ Garments come from DeepFashion2 only (web photos may be added for any label unde
 
 ### `evaluate.py`
 
-- Scores a run on validation, on the clothing dataset's `test` split ("users") and on `personal/`: per-label precision and recall, confusion matrix, top-1 and top-3 accuracy, balanced accuracy.
-- Threshold: the smallest `t` such that, among validation crops whose top-1 confidence is at least `t`, the top-1 label is correct for at least 95%. Validation is reweighted so every label counts equally. If no `t` reaches 95%, the threshold is 1.0 (never pre-fill). Stored with the run.
+- Splits the clothing dataset's `test` photographers in two by a stable hash: "usersVal" (picks the threshold) and "users" (the reported test).
+- Scores a run on validation, usersVal, users and `personal/`: per-label precision and recall, confusion matrix, top-1 and top-3 accuracy, balanced accuracy.
+- Threshold: the smallest `t` such that, among usersVal photos whose top-1 confidence is at least `t`, the top-1 label is correct for at least 95%, reweighted so every label counts equally. If no `t` reaches 95%, the threshold is 1.0 (never pre-fill). Without usersVal photos, validation is used instead. Stored with the run. (Changed 2026-10-22: it was picked on validation, mostly DeepFashion2, which gave 0.534 and only 91.9% right pre-fills on user photos.)
 - `--compare` prints one table across runs: model, size, the scores above, the threshold.
 
 ### Choosing the model

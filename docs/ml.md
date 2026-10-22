@@ -95,8 +95,9 @@ uv run python -m stylify_ml.export   --placeholder --out ../mobile/assets/model 
   - Keeps `best.pt` at the best validation balanced accuracy. Every setting is a flag and is recorded in `config.json`.
   - A run takes about 2.5 h on the owner's Mac (mobilenet) and up to 5 h (efficientnet).
 - **`evaluate`**:
-  - Scores validation, the clothing dataset's test half ("users") and `personal/`: per-label precision and recall, a confusion matrix, top-1, top-3 and balanced accuracy.
-  - Picks the confidence threshold: the lowest at which top-1 predictions are at least 95% correct on validation, reweighted so every label counts equally (1.0 if none reaches 95%).
+  - Splits the clothing dataset's test half again by photographer (a stable hash of `group`, about half each): "usersVal" picks the threshold and "users" is the reported test. Neither is trained on, and `prepare` is unchanged.
+  - Scores validation, usersVal, users and `personal/`: per-label precision and recall, a confusion matrix, top-1, top-3 and balanced accuracy.
+  - Picks the confidence threshold: the lowest at which top-1 predictions are at least 95% correct on usersVal, reweighted so every label counts equally (1.0 if none reaches 95%). Without test rows it falls back to validation; `thresholdFrom` in `metrics.json` says which.
   - Writes everything to `metrics.json`.
 - **`export`**:
   - Lowers `best.pt` to ExecuTorch with XNNPACK (float32, input `[1, 3, 224, 224]`).
@@ -144,20 +145,20 @@ The `.pte` is about 17 MB. If retraining becomes frequent, move it to Git LFS.
 
 ## Current model
 
-Shipped 2026-10-22: `efficientnet_b0`, run `20261022-180946-efficientnet_b0`, trained on Kaggle, threshold 0.534.
+Shipped 2026-10-22: `efficientnet_b0`, run `20261022-180946-efficientnet_b0`, trained on Kaggle, threshold 0.708 (recalibrated on usersVal on 2026-10-22; it was 0.534 when picked on validation).
 
-Comparison on 2026-10-22, all on the same crops (120,258; 2026-10-22 `prepare`, the first with the clothing dataset). "Users" is the clothing dataset's test half: 2,478 photos from 185 photographers, none of whose photos were trained on. "Personal" is the owner's 16 photos (7 tops, 2 each of outerwear, shorts, shoes and hats, 1 pair of trousers).
+Comparison on 2026-10-22, all on the same crops (120,258; 2026-10-22 `prepare`, the first with the clothing dataset). The clothing dataset's test half is 2,478 photos from 185 photographers, none of whose photos were trained on. "Users" is 1,754 of them from 103 photographers; the other 724 (82 photographers) are usersVal, which picks the threshold. Scores below are on users, re-evaluated 2026-10-22. "Personal" is the owner's 16 photos (7 tops, 2 each of outerwear, shorts, shoes and hats, 1 pair of trousers).
 
 | Run | Trained with clothing data | Val bal. acc. | Users top-1 | Users top-3 | Users bal. acc. | Personal top-1 | Threshold | `.pte` |
 |---|---|---|---|---|---|---|---|---|
-| **efficientnet_b0** `20261022-180946` | yes (Kaggle) | 0.930 | **0.893** | **0.987** | **0.876** | 0.812 (13/16) | 0.534 | 16.1 MB |
-| mobilenet_v3_large `20261022-160400` | yes (Kaggle) | 0.918 | 0.872 | 0.980 | 0.842 | 0.688 (11/16) | 0.581 | 16.9 MB |
-| efficientnet_b0 `20261022-041033` | no | 0.930 | 0.776 | 0.934 | 0.824 | 0.625 (10/16) | 0.536 | 16.1 MB |
-| mobilenet_v3_large `20261022-002231` | no (shipped earlier that day) | 0.917 | 0.730 | 0.921 | 0.766 | 0.812 (13/16) | 0.579 | 16.9 MB |
+| **efficientnet_b0** `20261022-180946` | yes (Kaggle) | 0.930 | **0.892** | **0.985** | **0.874** | 0.812 (13/16) | 0.708 | 16.1 MB |
+| mobilenet_v3_large `20261022-160400` | yes (Kaggle) | 0.918 | 0.870 | 0.980 | 0.833 | 0.688 (11/16) | 0.737 | 16.9 MB |
+| efficientnet_b0 `20261022-041033` | no | 0.930 | 0.780 | 0.938 | 0.813 | 0.625 (10/16) | 0.675 | 16.1 MB |
+| mobilenet_v3_large `20261022-002231` | no (shipped earlier that day) | 0.917 | 0.744 | 0.931 | 0.770 | 0.812 (13/16) | 0.766 | 16.9 MB |
 | mobilenetv4_conv_medium | not trained | | | | | | | 33.6 MB (test export) |
 
-- **The clothing data is what moved the users score.** The two architectures are 2 to 4 points apart; training on the volunteers' photos added 12 to 14 points (users top-1 0.730 → 0.893 from the earlier shipped model to this one), with validation almost unchanged. Validation (mostly DeepFashion2) could not show this gap.
-- **With 2,478 test photos the models separate clearly.** The earlier choice of mobilenet rested on 3 of 16 personal photos.
+- **The clothing data is what moved the users score.** The two architectures are 2 to 4 points apart; training on the volunteers' photos added 11 to 13 points (users top-1 0.744 → 0.892 from the earlier shipped model to this one), with validation almost unchanged. Validation (mostly DeepFashion2) could not show this gap.
+- **With 1,754 test photos the models separate clearly.** The earlier choice of mobilenet rested on 3 of 16 personal photos.
 - `mobilenetv4_conv_medium` was not trained: its `.pte` was 33.6 MB in a test export on 2026-10-17/18, over the 20 MB limit.
 - Training on Kaggle reproduces the Mac: the same models reach the same validation scores (0.930 and 0.917–0.918).
 
@@ -168,18 +169,18 @@ Targets (from the spec; reported, not enforced):
 | Validation balanced accuracy | ≥ 85% | 93.0% |
 | Personal top-1 | ≥ 80% | 81.2% |
 | Personal top-3 | ≥ 95% | 100% |
-| Users top-1 (added 2026-10-22) | | 89.3% |
+| Users top-1 (added 2026-10-22) | | 89.2% |
 | `.pte` size | ≤ 20 MB | 16.1 MB |
 
 What the shipped model gets wrong, on the users test:
 
 | Mistake | Photos | |
 |---|---|---|
-| top called `outerwear` | 65 | mostly shirts and cardigan-like tops |
-| dress called `top` | 50 | dress recall is 66%: a dress laid flat looks like a long top |
-| outerwear called `top` | 36 | |
-| trousers called `shorts` | 20 | |
+| top called `outerwear` | 44 | mostly shirts and cardigan-like tops |
+| dress called `top` | 35 | dress recall is 64%: a dress laid flat looks like a long top |
+| outerwear called `top` | 31 | |
+| trousers called `shorts` | 15 | |
 
-Shoes (recall 99%), hats (precision 97%) and trousers (precision 97%) are strong. There are no bags in either test set, so bags are measured on validation only.
+Shoes (recall 100%), hats (precision 97%) and trousers (precision 97%) are strong. There are no bags in either test set, so bags are measured on validation only.
 
-**The threshold is too low for user photos.** It is chosen on validation, where 95% of pre-fills are right. On the users test, 0.534 pre-fills 94% of photos and 91.9% of those are right; 0.7 gives 94.1% right on 85% of photos, 0.8 gives 95.8% on 76%. Two of the owner's photos are wrong above the threshold: a grey zip hoodie (`trousers` 0.66) and a white blouse (`outerwear` 0.65). The app does not read the threshold before Plan B. Before then, calibrate it on user photos that are neither trained on nor in the users test (for example, a third group of clothing-dataset photographers).
+**The threshold is picked on user photos.** Picked on validation (mostly DeepFashion2) it was 0.534, which on users pre-fills 93% of photos with only 91.9% right, and pre-filled two of the owner's photos wrongly (a grey zip hoodie as `trousers` 0.66, a white blouse as `outerwear` 0.65). Picked on usersVal it is 0.708: on users it pre-fills 84% of photos and 94.2% of those are right, and none of the owner's 8 pre-filled photos is wrong.

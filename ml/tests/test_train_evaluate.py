@@ -8,7 +8,8 @@ import torch
 from PIL import Image
 
 from stylify_ml import export
-from stylify_ml.evaluate import compare, evaluate
+from stylify_ml import evaluate as evaluate_module
+from stylify_ml.evaluate import compare, evaluate, users_half
 from stylify_ml.labels import LABELS
 from stylify_ml.manifest import Row, write_manifest
 from stylify_ml.train import default_device, train
@@ -51,14 +52,46 @@ def test_train_then_evaluate_then_compare(tiny_run):
     assert config["data"] == str(data) and config["run_id"] == "t1" and config["device"] == "cpu"
     assert config["amp"] is False
     m = evaluate(run, data)
-    assert set(m) == {"val", "users", "personal", "threshold", "pteBytes"}
+    assert set(m) == {"val", "usersVal", "users", "personal", "threshold", "thresholdFrom", "pteBytes"}
     assert 0.0 <= m["threshold"] <= 1.0 and m["personal"] is not None
-    assert m["val"]["n"] == 9 and m["users"]["n"] == 9 and m["personal"]["n"] == 9
+    assert m["val"]["n"] == 9 and m["personal"]["n"] == 9
+    assert m["usersVal"]["n"] + m["users"]["n"] == 9 and m["usersVal"]["n"] > 0 and m["users"]["n"] > 0
+    assert m["thresholdFrom"] == "usersVal"
     table = compare(data)
     assert "t1" in table
     cached = json.loads((run / "metrics.json").read_text())["pteBytes"]
     assert isinstance(cached, int) and cached > 0
     assert compare(data) == table
+
+
+def test_users_half_is_stable_and_splits_photographers():
+    groups = [f"clothing:{i}" for i in range(400)]
+    halves = [users_half(g) for g in groups]
+    assert set(halves) == {"usersVal", "users"}
+    assert 150 < halves.count("usersVal") < 250
+    assert halves == [users_half(g) for g in groups]
+    assert users_half("clothing:322") == users_half("clothing:322")
+
+
+def test_threshold_is_picked_on_users_val(tiny_run, tmp_path, monkeypatch):
+    data, run = tiny_run
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy)
+    seen = []
+    real = evaluate_module.pick_threshold
+    monkeypatch.setattr(evaluate_module, "pick_threshold", lambda p, t: seen.append(len(t)) or real(p, t))
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert seen == [m["usersVal"]["n"]]
+
+
+def test_threshold_falls_back_to_val_without_users(tiny_run, tmp_path):
+    data, run = tiny_run
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy)
+    manifest = copy / "manifest.csv"
+    manifest.write_text("".join(l for l in manifest.read_text().splitlines(keepends=True) if ",test," not in l))
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert m["users"] is None and m["usersVal"] is None and m["thresholdFrom"] == "val"
 
 
 def test_train_refuses_an_existing_run(tiny_run):

@@ -1,4 +1,7 @@
-"""Score a trained run on val, the clothing dataset's test half ("users") and personal photos, and compare runs."""
+"""Score a trained run on val, the clothing dataset's test half and personal photos, and compare runs.
+
+The test half's photographers are split again: "usersVal" picks the confidence threshold and "users" is reported.
+"""
 
 from __future__ import annotations
 
@@ -12,11 +15,18 @@ import torch
 from torch.utils.data import DataLoader
 
 from stylify_ml.data import ManifestDataset, eval_transform, load_image, load_personal
+from stylify_ml.manifest import mm_split
 from stylify_ml.metrics import pick_threshold, summarise
 from stylify_ml.models import load_checkpoint
 from stylify_ml.train import default_device, predict
 
 BATCH_SIZE = 32
+USERS_VAL_FRACTION = 0.5  # of the test half's photographers
+
+
+def users_half(group: str) -> str:
+    """Stable split of a test photographer into "usersVal" (picks the threshold) or "users" (reported)."""
+    return "usersVal" if mm_split(f"users-val:{group}", USERS_VAL_FRACTION) == "val" else "users"
 
 
 def _personal_probs(model, data: Path, device: str) -> tuple[np.ndarray, np.ndarray] | None:
@@ -41,13 +51,19 @@ def evaluate(run: Path, data: Path, device: str | None = None) -> dict:
     val = DataLoader(ManifestDataset(data, "val", eval_transform()), batch_size=BATCH_SIZE)
     val_probs, val_targets = predict(model, val, device)
     personal = _personal_probs(model, data, device)
-    test_set = ManifestDataset(data, "test", eval_transform())
-    users = predict(model, DataLoader(test_set, batch_size=BATCH_SIZE), device) if len(test_set) else None
+    halves = {}
+    for half in ("usersVal", "users"):
+        test_set = ManifestDataset(data, "test", eval_transform())
+        test_set.rows = [r for r in test_set.rows if users_half(r.group) == half]
+        halves[half] = predict(model, DataLoader(test_set, batch_size=BATCH_SIZE), device) if test_set.rows else None
+    threshold_from = "usersVal" if halves["usersVal"] is not None else "val"
     metrics = {
         "val": summarise(val_probs, val_targets),
-        "users": summarise(*users) if users is not None else None,
+        "usersVal": summarise(*halves["usersVal"]) if halves["usersVal"] is not None else None,
+        "users": summarise(*halves["users"]) if halves["users"] is not None else None,
         "personal": summarise(*personal) if personal is not None else None,
-        "threshold": pick_threshold(val_probs, val_targets),
+        "threshold": pick_threshold(*(halves["usersVal"] or (val_probs, val_targets))),
+        "thresholdFrom": threshold_from,
         "pteBytes": None,
     }
     (run / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n")
@@ -109,7 +125,8 @@ def main(argv: list[str] | None = None) -> None:
     else:
         m = evaluate(args.run, args.data, args.device)
         personal, users = m["personal"], m["users"]
-        print(f"val balanced accuracy {m['val']['balanced_accuracy']:.4f}, threshold {m['threshold']:.4f}, "
+        print(f"val balanced accuracy {m['val']['balanced_accuracy']:.4f}, "
+              f"threshold {m['threshold']:.4f} (from {m['thresholdFrom']}), "
               f"users top-1 {_fmt(users['top1'] if users else None)}, "
               f"personal top-1 {_fmt(personal['top1'] if personal else None)}")
 
