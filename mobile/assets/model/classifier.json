@@ -24,13 +24,13 @@
       0.225
     ]
   },
-  "threshold": 1.0,
-  "model": "placeholder",
-  "run": null,
-  "exportedAt": "2026-10-18T03:02:59.217471+00:00",
+  "threshold": 0.578906238079071,
+  "model": "mobilenet_v3_large",
+  "run": "20261022-002231-mobilenet_v3_large",
+  "exportedAt": "2026-10-22T11:28:29.747887+00:00",
   "scores": {
-    "valBalancedAccuracy": null,
-    "personalTop1": null,
-    "personalTop3": null
+    "valBalancedAccuracy": 0.917435444695011,
+    "personalTop1": 0.8125,
+    "personalTop3": 1.0
   }
 }

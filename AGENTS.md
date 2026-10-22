@@ -9,6 +9,7 @@ server/     Hono API on Bun. Deployed as a Lambda container.
 frontend/   React 19 + Vite SPA. Deployed to S3 behind CloudFront.
 shared/     @stylify/shared: Zod schemas and types used by server and frontend.
 mobile/     Expo SDK 55 iPhone app. Not deployed by CI.
+ml/         uv Python project: trains and exports the clothing classifier. Not deployed.
 drizzle/    SQL migrations (generated; do not hand-edit).
 infra/      CloudFront Function source. Published by hand; not deployed by CI.
 docs/       Architecture docs. Read the relevant one before changing that area.
@@ -29,6 +30,8 @@ docs/       Architecture docs. Read the relevant one before changing that area.
 | `mobile/src/lib/api.ts` | Typed Hono client and `queryOptions` for the app |
 | `mobile/src/lib/authFetch.ts` | 401/503 rules, with tests |
 | `mobile/src/app/` | Expo Router routes; `_layout.tsx` is the auth guard |
+| `ml/stylify_ml/` | `prepare`, `train`, `evaluate`, `export` for the classifier, with tests in `ml/tests/` |
+| `mobile/assets/model/` | The shipped classifier: `classifier.pte` and `classifier.json` |
 
 ## Commands
 
@@ -48,6 +51,7 @@ bun test ./frontend              # web API client tests (excluded from the front
 (cd frontend && bun run build)   # frontend build (does not typecheck)
 (cd mobile && bunx tsc --noEmit && bun test src) # mobile typecheck and tests
 (cd mobile && bunx expo run:ios --device "iPhone 17") # build and open the simulator (needs Xcode)
+(cd ml && uv run pytest)         # classifier pipeline tests (needs uv; no data)
 ```
 
 Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`, then `bun migrate.ts`.
@@ -65,6 +69,7 @@ Schema changes: edit `server/db/schema/items.ts`, run `bun drizzle-kit generate`
 - **Server and web installs need `--omit=peer` as well as `--filter`.** The server's Kinde SDK has an optional peer, `expo-secure-store`, which `mobile/` puts in the lockfile. Without `--omit=peer`, `--filter server` installs Expo and React Native (about 700 packages instead of about 100). The Dockerfile and both deploy workflows use it. After changing any of them, check `docker run --rm <image> sh -c 'ls node_modules | wc -l'` prints about 57.
 - **API 404s reach clients as 404 since 2026-10-13.** Before that, CloudFront turned them into `200 text/html`. `mobile/src/lib/unmaskNotFound.ts` is kept as a guard and is a no-op while that holds.
 - **Never print or commit `.env` values.**
+- **Datasets, crops, runs and personal photos never go in the repo** (licences forbid redistribution). They live in `~/stylify-data/`; only `mobile/assets/model/` is committed. See `docs/ml.md`.
 
 ## Patterns
 
@@ -103,6 +108,7 @@ Then, in a browser: log in, create an item, edit it, delete it, log out.
 | `docs/zod.md` | The shared schema and validation chain |
 | `docs/hono-rpc.md` | The end-to-end type chain |
 | `docs/mobile.md` | The Expo app: running, auth, release |
+| `docs/ml.md` | The clothing classifier: data, training, choosing and shipping a model |
 | `docs/data-flow.md` | Request traces, Vite proxy |
 | `docs/cloud-architecture.md` | Lambda, API Gateway, S3, CloudFront, DNS, manual deploy |
 | `docs/superpowers/specs/` | Design specs, including the roadmap |
