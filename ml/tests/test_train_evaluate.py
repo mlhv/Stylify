@@ -148,3 +148,18 @@ def test_train_and_evaluate_import_without_executorch():
     code = "import sys; import stylify_ml.train, stylify_ml.evaluate; print('executorch' in sys.modules)"
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert out.stdout.strip() == "False"
+
+
+def test_export_run_trained_elsewhere_finds_its_data(tiny_run, tmp_path):
+    data, run = tiny_run
+    if not (run / "metrics.json").exists():
+        evaluate(run, data)
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy)
+    moved = copy / "runs" / run.name
+    config = json.loads((moved / "config.json").read_text())
+    config["data"] = "/tmp/stylify/data-on-kaggle"  # recorded path that does not exist here
+    (moved / "config.json").write_text(json.dumps(config))
+    out = tmp_path / "out"
+    export.main(["--run", str(moved), "--out", str(out)])
+    assert (out / "classifier.pte").stat().st_size > 0

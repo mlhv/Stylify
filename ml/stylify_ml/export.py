@@ -92,16 +92,27 @@ def _export_placeholder(out_dir: Path) -> None:
     torch.nn.init.zeros_(last.bias)
     _export_to(out_dir, model, torch.rand(2, 3, INPUT_SIZE, INPUT_SIZE), threshold=1.0, name="placeholder",
                run=None, scores={"valBalancedAccuracy": None, "personalTop1": None, "personalTop3": None,
-                       "usersTop1": None, "usersTop3": None})
+                                 "usersTop1": None, "usersTop3": None})
 
 
-def _export_run(run: Path, out_dir: Path) -> None:
+def _run_data(run: Path, data: Path | None) -> Path:
+    """The --data folder for a run: given, else as recorded in config.json, else the folder holding runs/.
+
+    A run trained elsewhere (Kaggle) records a path that does not exist here.
+    """
+    if data is not None:
+        return Path(data)
+    recorded = Path(json.loads((run / "config.json").read_text())["data"])
+    return recorded if (recorded / "manifest.csv").exists() else run.parent.parent
+
+
+def _export_run(run: Path, out_dir: Path, data: Path | None = None) -> None:
     run = Path(run)
     model, meta = load_checkpoint(run / "best.pt")
     if meta["labels"] != list(LABELS):
         raise ValueError(f"checkpoint labels {meta['labels']} differ from the current LABELS {list(LABELS)}")
     metrics = json.loads((run / "metrics.json").read_text())
-    data = Path(json.loads((run / "config.json").read_text())["data"])
+    data = _run_data(run, data)
     val = ManifestDataset(data, "val", eval_transform())
     if not len(val):
         raise ValueError(f"no val rows in {data / 'manifest.csv'} for the parity check")
@@ -125,11 +136,13 @@ def main(argv: list[str] | None = None) -> None:
     mode.add_argument("--run", type=Path, help="run directory holding best.pt and metrics.json")
     mode.add_argument("--placeholder", action="store_true", help="export an untrained model that always abstains")
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--data", type=Path, default=None,
+                        help="data folder for the parity crops; default: the run's recorded one, else ../..")
     args = parser.parse_args(argv)
     if args.placeholder:
         _export_placeholder(args.out)
     else:
-        _export_run(args.run, args.out)
+        _export_run(args.run, args.out, args.data)
 
 
 if __name__ == "__main__":
