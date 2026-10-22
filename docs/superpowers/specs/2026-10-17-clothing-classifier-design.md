@@ -87,6 +87,11 @@ Both are licensed for non-commercial research only and may not be redistributed.
 
 - Added because every MultiModal hat and bag is a crop of an item on a model, and the owner's cap was called `top` at 0.85 to 0.88 confidence, above both thresholds. Same reasoning and same handling as the web shoes.
 
+**Clothing dataset** (added 2026-10-22): https://www.kaggle.com/datasets/agrigorev/clothing-dataset-full, CC0. 5,403 photos of clothes taken by 351 volunteers with their own phones, mostly laid flat or hanging at home, with a `sender_id` per photographer. No bags.
+
+- Added because these look like the photos the app will get, and 16 personal photos are too few to choose a model. Half the photographers' photos are training data; the other half is the "users" test set, which decides the winner.
+- Label mapping: T-Shirt, Longsleeve, Shirt, Polo, Top, Blouse, Undershirt → top; Outwear, Blazer → outerwear; Pants → trousers; Shorts, Skirt, Dress, Shoes, Hat → the same label; Hoodie is sorted image by image (pullover → top, zip-up → outerwear); Body, Not sure, Other and Skip are dropped.
+
 ## Labels
 
 Nine labels, in this output order:
@@ -118,6 +123,7 @@ Garments come from DeepFashion2 only (web photos may be added for any label unde
   raw/deepfashion2/{train,validation}/   unzipped, deleted after prepare
   raw/multimodal/images/ and parsing/    MultiModal images and masks
   raw/web/<label>/<source>/...           web photos: shoes (shoenet, jhovanni), hat and bag (myntra, headgear)
+  raw/clothing/images.csv, images/       the clothing dataset (compressed 400x534 images)
   crops/<label>/<id>.jpg                 the crop cache
   manifest.csv
   personal/<label>/*.jpg                 Minh's own photos, never trained on
@@ -137,9 +143,10 @@ Garments come from DeepFashion2 only (web photos may be added for any label unde
 - MultiModal: for footwear, headwear and bag, the box is the bounding box of that class's pixels in the parsing mask. Boxes under 64 px on the short side are skipped.
 - Web photos: the folder under `raw/web/` names the label (it must be one of the nine, or `prepare.py` stops with an error; names starting with `.` are skipped). Every image under `raw/web/<label>/` (jpg, jpeg, png, webp; sorted path order) is one crop of the whole image, with no widening. Images under 64 px on the short side are skipped. Duplicates across all of `raw/web/`, whatever the label, are removed by a 64-bit difference hash (the first image in path order is kept). The split is 85/15 by that hash, and `group` is `web:<hash>`.
 - Every DeepFashion2 and MultiModal box is widened by 10% on each side (clamped to the image), cropped, resized so the long side is 256 px, and saved as JPEG quality 90. Web photos (any label) are used whole, then resized and saved the same way.
-- `manifest.csv` columns: `path, label, source (df2|mm|web), split (train|val), group (item ID), origin (shop|user|studio|web)`.
+- `manifest.csv` columns: `path, label, source (df2|mm|web), split (train|val|test), group (item ID), origin (shop|user|studio|web)`.
 - Splits: DeepFashion2 keeps its own train and validation split. Its `pair_id` numbering is separate in each split, so `group` is `df2:<split>:<pair_id>`. MultiModal is split 85/15 by item ID, parsed from the file name (for example `id_00000080`; confirm the format once the images are downloaded), with `group` `mm:<item ID>`, so one product's photos never appear on both sides.
 - Balance: at most 8,000 training crops per garment label, chosen at random with a fixed seed. Validation is not capped. Shoes, hats and bags are capped per (label, source): at most 4,000 training crops from MultiModal and 4,000 from web photos for each, so about half the shoes are on feet and half are not.
+- Clothing dataset: each photo is used whole, never capped, and split 50/50 by `sender_id` (stable hash) into `train` and `test`; `source` `clothing`, `origin` `user`, `group` `clothing:<sender_id>`. Hand-sorted labels and corrections live in `ml/stylify_ml/clothing_overrides.csv` (`image,label`, label or `drop`).
 - Inputs are checked before anything is deleted: `raw/deepfashion2/{train,validation}/annos`, `raw/multimodal/parsing` and the `raw/web/<label>` folder names. A missing folder or unknown label raises an error and leaves `crops/` and `manifest.csv` as they were.
 - MultiModal bag boxes narrower than 0.4 of their height (`BAG_MIN_ASPECT`) are dropped as slivers at the frame edge.
 - The script prints counts per label, source and split.
@@ -155,13 +162,13 @@ Garments come from DeepFashion2 only (web photos may be added for any label unde
 
 ### `evaluate.py`
 
-- Scores a run on validation and on `personal/`: per-label precision and recall, confusion matrix, top-1 and top-3 accuracy, balanced accuracy.
+- Scores a run on validation, on the clothing dataset's `test` split ("users") and on `personal/`: per-label precision and recall, confusion matrix, top-1 and top-3 accuracy, balanced accuracy.
 - Threshold: the smallest `t` such that, among validation crops whose top-1 confidence is at least `t`, the top-1 label is correct for at least 95%. Validation is reweighted so every label counts equally. If no `t` reaches 95%, the threshold is 1.0 (never pre-fill). Stored with the run.
 - `--compare` prints one table across runs: model, size, the scores above, the threshold.
 
 ### Choosing the model
 
-Train all three candidates on the same data and splits. The winner has the best top-1 on `personal/` among models whose `.pte` is 20 MB or less, with balanced validation accuracy as the tie-break. If `mobilenetv4_conv_medium` does not export cleanly, it is dropped and recorded as such.
+Train all three candidates on the same data and splits. The winner has the best users top-1 (the clothing dataset's test half) among models whose `.pte` is 20 MB or less, with balanced validation accuracy as the tie-break. Until 2026-10-22 the rule used personal top-1, which with 16 photos turned on 3 of them; personal scores are still reported. If `mobilenetv4_conv_medium` does not export cleanly, it is dropped and recorded as such.
 
 ### `export.py`
 
@@ -179,7 +186,7 @@ Train all three candidates on the same data and splits. The winner has the best 
   "model": "efficientnet_b0",
   "run": "<run-id>",
   "exportedAt": "<date>",
-  "scores": { "valBalancedAccuracy": 0.0, "personalTop1": 0.0, "personalTop3": 0.0 }
+  "scores": { "valBalancedAccuracy": 0.0, "personalTop1": 0.0, "personalTop3": 0.0, "usersTop1": 0.0, "usersTop3": 0.0 }
 }
 ```
 

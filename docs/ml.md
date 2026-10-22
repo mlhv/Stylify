@@ -17,6 +17,7 @@ Nine, in output order: `top`, `outerwear`, `trousers`, `shorts`, `skirt`, `dress
   raw/deepfashion2/{train,validation}/   unzipped for prepare, then deleted (about 13 GB)
   raw/multimodal/images/ and parsing/    MultiModal images and parsing masks (1.6 GB)
   raw/web/<label>/<source>/...           web photos (630 MB); <label> must be one of the nine
+  raw/clothing/images.csv and images/    the clothing dataset: volunteers' own photos, 400x534
   crops/<label>/*.jpg                    crop cache built by prepare (1.7 GB)
   manifest.csv                           one row per crop: path, label, source, split, group, origin
   personal/<label>/*                     the owner's own photos (jpg, png, heic); never trained on
@@ -31,6 +32,7 @@ Nine, in output order: `top`, `outerwear`, `trousers`, `shorts`, `skirt`, `dress
 | jhovanni/shoe-dataset | shoes | https://huggingface.co/datasets/jhovanni/shoe-dataset, `train/` and `validation/` only, into `raw/web/shoes/jhovanni/` |
 | Myntra catalogue (384x512) | bags and caps | https://huggingface.co/datasets/benitomartin/fashion-product-images-small-384x512, article types Handbags, Backpacks, Clutches, Laptop Bag, Duffel Bag, Messenger Bag, Rucksacks, Waist Pouch (into `raw/web/bag/myntra/<type>/`) and Caps, Hat (into `raw/web/hat/myntra/<type>/`) |
 | Kaggle Headgear (CC0) | hats | https://www.kaggle.com/datasets/gpiosenka/headgear-image-classification. Only the wearable classes ASCOT CAP, BASEBALL CAP, BERET, BOATER, BOWLER, DEERSTALKER, FEDORA, PORK PIE, TOP HAT, into `raw/web/hat/headgear/{train,valid,test}/<CLASS>/` |
+| Clothing dataset (CC0) | garments, shoes, hats; half for training, half as the "users" test | https://www.kaggle.com/datasets/agrigorev/clothing-dataset-full: `images.csv` into `raw/clothing/`, and `images_compressed/*.jpg` into `raw/clothing/images/` (the originals are not needed). `uvx kaggle datasets download agrigorev/clothing-dataset-full` fetches it all |
 
 The web photos were added because the owner's own shoe and cap photos failed: every MultiModal shoe, hat and bag is worn or carried by a model, seen from the front. Web folders are read recursively, so any sub-folder layout works. `prepare` removes duplicate images across all of `raw/web/`.
 
@@ -85,6 +87,7 @@ uv run python -m stylify_ml.export   --placeholder --out ../mobile/assets/model 
   - Skips crops under 64 px on the short side, heavily occluded DeepFashion2 items, MultiModal bag slivers (narrower than 0.4 of their height), and duplicate web photos.
   - Caps training crops at 8,000 per garment label (`--garment-cap`), and at 4,000 from MultiModal and 4,000 from all web photos together, for each of shoes, hats and bags (`--accessory-cap`). Validation is not capped.
   - Splits: DeepFashion2 keeps its own train/validation split. MultiModal and web photos split 85/15 by a stable hash of the item ID or image hash.
+  - The clothing dataset is used whole, uncapped, and split 50/50 **by photographer** (`sender_id`) into `train` and `test`, so one person's room and lighting never appear on both sides. Its labels map as in `CLOTHING_LABEL_TO_LABEL` (`labels.py`); `Body`, `Not sure`, `Other` and `Skip` are dropped. `Hoodie` is sorted by hand in `stylify_ml/clothing_overrides.csv` (pullover → `top`, zip-up → `outerwear`, unclear → `drop`); that file can also correct any other image.
   - Rebuilds everything from `raw/`, so it needs `raw/deepfashion2/` on every run: re-unzip DeepFashion2 before each `prepare`, then delete it again. It stops with an error, before touching `crops/`, if `raw/deepfashion2/` (train and validation) or `raw/multimodal/parsing/` is missing, or if a folder under `raw/web/` is not one of the nine labels.
 - **`train`**:
   - Two phases: 3 epochs training only the new 9-output layer (learning rate 1e-3), then 12 epochs on the whole network (1e-4).
@@ -92,7 +95,7 @@ uv run python -m stylify_ml.export   --placeholder --out ../mobile/assets/model 
   - Keeps `best.pt` at the best validation balanced accuracy. Every setting is a flag and is recorded in `config.json`.
   - A run takes about 2.5 h on the owner's Mac (mobilenet) and up to 5 h (efficientnet).
 - **`evaluate`**:
-  - Scores validation and `personal/`: per-label precision and recall, a confusion matrix, top-1, top-3 and balanced accuracy.
+  - Scores validation, the clothing dataset's test half ("users") and `personal/`: per-label precision and recall, a confusion matrix, top-1, top-3 and balanced accuracy.
   - Picks the confidence threshold: the lowest at which top-1 predictions are at least 95% correct on validation, reweighted so every label counts equally (1.0 if none reaches 95%).
   - Writes everything to `metrics.json`.
 - **`export`**:
@@ -133,7 +136,7 @@ uv run python -m stylify_ml.evaluate --data ~/stylify-data --compare
 
 1. Add or change data under `raw/` or `personal/`. Re-unzip DeepFashion2: `prepare` needs it every run.
 2. `prepare`, then `train` each candidate, then `evaluate` each run, then `evaluate --compare`.
-3. Pick the winner: the best personal top-1 among models whose `.pte` is 20 MB or less, with validation balanced accuracy as the tie-break.
+3. Pick the winner: the best users top-1 among models whose `.pte` is 20 MB or less, with validation balanced accuracy as the tie-break. Check the personal photos too; a model that is clearly worse on them needs a closer look.
 4. `export` the winner to `../mobile/assets/model`. Commit both files.
 5. Rebuild the iPhone app so it bundles the new model (`docs/mobile.md`). The app does not read `classifier.json` yet; it will once Plan B lands, taking the labels, preprocessing and threshold from it. A threshold of 1.0 or more means "never pre-fill".
 
