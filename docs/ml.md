@@ -141,7 +141,7 @@ uv run python -m stylify_ml.evaluate --data ~/stylify-data --compare
 4. `export` the winner to `../mobile/assets/model`. Commit both files.
 5. Rebuild the iPhone app so it bundles the new model (`docs/mobile.md`). The app reads the labels, preprocessing and threshold from `classifier.json`. A threshold of 1.0 or more means "never pre-fill".
 
-The `.pte` is about 17 MB. If retraining becomes frequent, move it to Git LFS.
+The `.pte` is about 16 MB. If retraining becomes frequent, move it to Git LFS.
 
 ## Current model
 

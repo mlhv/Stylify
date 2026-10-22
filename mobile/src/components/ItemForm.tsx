@@ -197,7 +197,10 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
                             className={`rounded-full px-3 py-1 ${selected ? 'bg-neutral-900' : 'bg-neutral-200'}`}
                             accessibilityRole="button"
                             accessibilityLabel={`Set type to ${chip}`}
-                            onPress={() => setType(chip)}>
+                            onPress={() => {
+                              lastPrefill.current = null
+                              setType(chip)
+                            }}>
                             <Text className={selected ? 'text-white' : undefined}>{chip}</Text>
                           </Pressable>
                         )

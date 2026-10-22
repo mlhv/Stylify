@@ -41,6 +41,7 @@ bunx expo run:ios --device "<hardware UDID>"
 - `mobile/package.json` has a `postinstall` (`scripts/executorch-libs.cjs`) that runs `react-native-executorch`'s `download-libs.js` with the `"react-native-executorch"` block (`features: ["classification"]`) in that file. Bun does not run dependencies' postinstalls, so this is how the prebuilt ExecuTorch binaries (about 175 MB in `node_modules/react-native-executorch/third-party/`) get downloaded. The filtered server and web installs do not run it.
 - The classifier lives in `mobile/assets/model/` (`classifier.pte`, `classifier.json`); Metro treats `.pte` as an asset.
 - A plain `bun install` that finds nothing to change does not re-run the download. `bun install --force` or `node mobile/scripts/executorch-libs.cjs` restores `third-party/`.
+- `react-native-executorch` brings in the native module `react-native-device-info` transitively (pinned only by the lockfile), so it appears in `prebuild` and `Podfile.lock`.
 - `react-native-worklets` and `react-native-reanimated` are newer than SDK 55 expects; see `AGENTS.md`.
 
 ### Why SDK 55
@@ -101,7 +102,7 @@ The add and edit forms suggest the item type from the photo (`src/lib/classify.t
 
 Checked on 2026-10-22 on an iPhone 13 Pro (iOS 27.0.1), in a Release build (`bunx expo run:ios --configuration Release --device <hardware UDID>`) installed from Xcode 26.3 with free provisioning. Model: efficientnet_b0, run `20261022-180946-efficientnet_b0`, threshold 0.708.
 
-- **Time:** one photo measured, 158 ms from photo to suggestion. The `[classify]` log covers resize, decode and inference, plus the model load because it was the first photo. Model load was not timed separately. This is under the 300 ms limit, so the `jpeg-js` decode stays and no native decode was added.
+- **Time:** one photo measured, 158 ms from photo to suggestion. The `[classify]` log covers resize, decode and inference, and may include the model load (whether it was the first photo since launch was not recorded). Model load was not timed separately. This is under the 300 ms limit, so the `jpeg-js` decode stays and no native decode was added.
 - **Simulator:** "Identifying..." then chips; a chip tap sets the type; a typed type is kept; editing an item and changing its photo keeps the saved type; the tab bar and navigation animations are normal after the Reanimated 4.5.5 and worklets 0.10.4 upgrade.
 - **Phone:** a black zip hoodie in the simulator and one photo on the phone were pre-filled correctly. The per-label check (one fresh photo per label) was not done.
 - **App size** (Settings -> iPhone Storage): 119.4 MB before, 83.4 MB after. Not like-for-like: the before figure is a debug build, the after figure is a Release build with the classifier. The model adds about 16 MB, plus the ExecuTorch libraries.
@@ -109,6 +110,7 @@ Checked on 2026-10-22 on an iPhone 13 Pro (iOS 27.0.1), in a Release build (`bun
 
 ## Known limits
 
+- The Release build's sign-in, add, edit, delete and sign-out smoke test was not run on the phone after the classifier landed; the simulator debug build was checked only for navigation and the form.
 - The classifier was not checked on the phone with one photo per label. Dresses and tops against outerwear are the model's weak spots (`docs/ml.md`) and are unverified there.
 - Checked on a device on 2026-10-08 (iPhone 13 Pro, iOS 27.0.1): sign-in and wardrobe match the web; add with the camera and with the library; permission denial alert and "Open Settings"; edit name and photo; Airplane Mode during add, then retry saves once; delete; an item deleted on the web shows "This item no longer exists"; a second account sees an empty wardrobe; still signed in after force-quit. Airplane Mode with pull to refresh: the grid stays, no error is shown, and the user stays signed in.
 - A Kinde 5xx during a token refresh still signs the user out, because the SDK does not distinguish it from a rejected token (see `refreshOutcome.ts`).
