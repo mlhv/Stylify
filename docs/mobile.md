@@ -24,13 +24,15 @@ One-time setup:
 Install, from `mobile/`:
 
 ```bash
-xcrun devicectl list devices                 # name and UDID of the phone
-bunx expo run:ios --device "<name or UDID>"
+xcrun xctrace list devices                   # hardware UDID of the phone
+bunx expo run:ios --device "<hardware UDID>"
 ```
+
+`expo run:ios --device` needs the hardware UDID from `xctrace`, not the identifier `xcrun devicectl list devices` prints.
 
 `--no-bundler` installs without starting Metro; run `bunx expo start` afterwards to serve the app.
 
-- **Trust the developer** on first launch: Settings → General → VPN & Device Management. Until then the launch fails with "invalid code signature ... not been explicitly trusted".
+- **Trust the developer** on first launch: Settings → General → VPN & Device Management. Until then the launch fails with "invalid code signature ... not been explicitly trusted". Re-signing after `prebuild --clean` makes iOS ask for this trust again.
 - **The build expires after 7 days.** Run the install command again to renew it.
 - **The phone must reach Metro on the Mac:** same Wi-Fi, and Local Network allowed for Stylify (Settings → Privacy & Security → Local Network). Otherwise the app shows a red "No script URL provided" banner. The Mac's address is baked into the build, so a changed network needs a rebuild. Networks that block device-to-device traffic (common on university and office Wi-Fi) do not work; a personal hotspot does.
 
@@ -38,6 +40,7 @@ bunx expo run:ios --device "<name or UDID>"
 
 - `mobile/package.json` has a `postinstall` (`scripts/executorch-libs.cjs`) that runs `react-native-executorch`'s `download-libs.js` with the `"react-native-executorch"` block (`features: ["classification"]`) in that file. Bun does not run dependencies' postinstalls, so this is how the prebuilt ExecuTorch binaries (about 175 MB in `node_modules/react-native-executorch/third-party/`) get downloaded. The filtered server and web installs do not run it.
 - The classifier lives in `mobile/assets/model/` (`classifier.pte`, `classifier.json`); Metro treats `.pte` as an asset.
+- A plain `bun install` that finds nothing to change does not re-run the download. `bun install --force` or `node mobile/scripts/executorch-libs.cjs` restores `third-party/`.
 - `react-native-worklets` and `react-native-reanimated` are newer than SDK 55 expects; see `AGENTS.md`.
 
 ### Why SDK 55
@@ -92,8 +95,21 @@ There is no TestFlight and no EAS: no `eas.json`, no Apple Developer Program enr
 
 Nothing under `mobile/` triggers a deploy, and there is no CI for mobile.
 
+### Classifier
+
+The add and edit forms suggest the item type from the photo (`src/lib/classify.ts`). It resizes with `expo-image-manipulator`, decodes with `jpeg-js` and runs the model with `react-native-executorch`. Labels, preprocessing and the threshold come from `classifier.json`. It logs `[classify] <ms>` with `console.log`.
+
+Checked on 2026-10-22 on an iPhone 13 Pro (iOS 27.0.1), in a Release build (`bunx expo run:ios --configuration Release --device <hardware UDID>`) installed from Xcode 26.3 with free provisioning. Model: efficientnet_b0, run `20261022-180946-efficientnet_b0`, threshold 0.708.
+
+- **Time:** one photo measured, 158 ms from photo to suggestion. The `[classify]` log covers resize, decode and inference, plus the model load because it was the first photo. Model load was not timed separately. This is under the 300 ms limit, so the `jpeg-js` decode stays and no native decode was added.
+- **Simulator:** "Identifying..." then chips; a chip tap sets the type; a typed type is kept; editing an item and changing its photo keeps the saved type; the tab bar and navigation animations are normal after the Reanimated 4.5.5 and worklets 0.10.4 upgrade.
+- **Phone:** a black zip hoodie in the simulator and one photo on the phone were pre-filled correctly. The per-label check (one fresh photo per label) was not done.
+- **App size** (Settings -> iPhone Storage): 119.4 MB before, 83.4 MB after. Not like-for-like: the before figure is a debug build, the after figure is a Release build with the classifier. The model adds about 16 MB, plus the ExecuTorch libraries.
+- **Console.app:** `console.log` lines show only with Action -> Include Info Messages (subsystem `com.facebook.react.log`, category `javascript`).
+
 ## Known limits
 
+- The classifier was not checked on the phone with one photo per label. Dresses and tops against outerwear are the model's weak spots (`docs/ml.md`) and are unverified there.
 - Checked on a device on 2026-10-08 (iPhone 13 Pro, iOS 27.0.1): sign-in and wardrobe match the web; add with the camera and with the library; permission denial alert and "Open Settings"; edit name and photo; Airplane Mode during add, then retry saves once; delete; an item deleted on the web shows "This item no longer exists"; a second account sees an empty wardrobe; still signed in after force-quit. Airplane Mode with pull to refresh: the grid stays, no error is shown, and the user stays signed in.
 - A Kinde 5xx during a token refresh still signs the user out, because the SDK does not distinguish it from a rejected token (see `refreshOutcome.ts`).
 - When a refresh fails offline while cached items are shown, the grid simply stays; no message says it is stale.

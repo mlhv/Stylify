@@ -139,7 +139,7 @@ uv run python -m stylify_ml.evaluate --data ~/stylify-data --compare
 2. `prepare`, then `train` each candidate, then `evaluate` each run, then `evaluate --compare`.
 3. Pick the winner: the best users top-1 among models whose `.pte` is 20 MB or less, with validation balanced accuracy as the tie-break. Check the personal photos too; a model that is clearly worse on them needs a closer look.
 4. `export` the winner to `../mobile/assets/model`. Commit both files.
-5. Rebuild the iPhone app so it bundles the new model (`docs/mobile.md`). The app does not read `classifier.json` yet; it will once Plan B lands, taking the labels, preprocessing and threshold from it. A threshold of 1.0 or more means "never pre-fill".
+5. Rebuild the iPhone app so it bundles the new model (`docs/mobile.md`). The app reads the labels, preprocessing and threshold from `classifier.json`. A threshold of 1.0 or more means "never pre-fill".
 
 The `.pte` is about 17 MB. If retraining becomes frequent, move it to Git LFS.
 
