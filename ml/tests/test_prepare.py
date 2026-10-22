@@ -57,6 +57,17 @@ def make_raw(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def _seed_cache(raw: Path) -> None:
+    (raw / "crops" / "top").mkdir(parents=True)
+    (raw / "crops" / "top" / "old.jpg").write_bytes(b"x")
+    (raw / "manifest.csv").write_text("old")
+
+
+def _assert_cache_survives(raw: Path) -> None:
+    assert (raw / "crops" / "top" / "old.jpg").exists()
+    assert (raw / "manifest.csv").read_text() == "old"
+
+
 @pytest.fixture
 def raw(tmp_path: Path) -> Path:
     return make_raw(tmp_path)
@@ -320,6 +331,36 @@ def test_unknown_web_label_folder_raises(raw):
     _pattern(raw / "raw" / "web" / "jewellery" / "x" / "a.jpg", "lr")
     with pytest.raises(ValueError, match="jewellery"):
         prepare(raw)
+
+
+def test_unknown_web_label_keeps_existing_crops(raw):
+    _pattern(raw / "raw" / "web" / "jewellery" / "x" / "a.jpg", "lr")
+    _seed_cache(raw)
+    with pytest.raises(ValueError, match="jewellery"):
+        prepare(raw)
+    _assert_cache_survives(raw)
+
+
+@pytest.mark.parametrize("missing", [
+    "raw/deepfashion2/train/annos",
+    "raw/deepfashion2/validation/annos",
+    "raw/multimodal/parsing",
+])
+def test_missing_raw_input_raises_and_keeps_existing_crops(raw, missing):
+    import shutil
+
+    shutil.rmtree(raw / missing)
+    _seed_cache(raw)
+    with pytest.raises(ValueError, match="docs/ml.md") as e:
+        prepare(raw)
+    assert missing in str(e.value)
+    _assert_cache_survives(raw)
+
+
+def test_empty_raw_folders_are_allowed(tmp_path):
+    for d in ("deepfashion2/train/annos", "deepfashion2/validation/annos", "multimodal/parsing"):
+        (tmp_path / "raw" / d).mkdir(parents=True)
+    assert prepare(tmp_path)["crops"] == 0
 
 
 def test_hidden_web_folder_is_skipped(raw):

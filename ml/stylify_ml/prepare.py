@@ -157,8 +157,6 @@ def _collect_web(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
         if label_dir.name.startswith(".") or not label_dir.is_dir():
             continue
         label = label_dir.name
-        if label not in LABELS:
-            raise ValueError(f"raw/web/{label} is not a label; expected one of {list(LABELS)}")
         for path in sorted(p for p in label_dir.rglob("*") if p.is_file()):
             if path.suffix.lower() not in WEB_SUFFIXES or path.name.startswith("."):
                 continue
@@ -207,10 +205,30 @@ def _write_crops(data: Path, pending: list[_Pending], counts: Counter) -> list[_
     return written
 
 
+def _check_inputs(data: Path) -> None:
+    """Fail before anything is deleted if raw/ is incomplete or has a stray raw/web folder."""
+    required = (
+        data / "raw" / "deepfashion2" / "train" / "annos",
+        data / "raw" / "deepfashion2" / "validation" / "annos",
+        data / "raw" / "multimodal" / "parsing",
+    )
+    for path in required:
+        if not path.is_dir():
+            what = "unzip DeepFashion2 into raw/deepfashion2/ (train and validation)" if "deepfashion2" in path.parts else "restore the MultiModal download under raw/multimodal/"
+            raise ValueError(f"missing {path}; {what}; see docs/ml.md")
+    web = data / "raw" / "web"
+    for label_dir in sorted(web.iterdir()) if web.is_dir() else []:
+        if label_dir.name.startswith(".") or not label_dir.is_dir():
+            continue
+        if label_dir.name not in LABELS:
+            raise ValueError(f"raw/web/{label_dir.name} is not a label; expected one of {list(LABELS)}")
+
+
 def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64, accessory_cap: int = 4000) -> dict[str, int]:
     """Rebuild data/crops/ and data/manifest.csv from data/raw/. Returns summary counts."""
     data = Path(data)
     data.mkdir(parents=True, exist_ok=True)
+    _check_inputs(data)
     shutil.rmtree(data / "crops", ignore_errors=True)
     (data / "manifest.csv").unlink(missing_ok=True)
 

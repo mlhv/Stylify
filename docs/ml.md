@@ -38,8 +38,8 @@ To unzip DeepFashion2 (use `unzip`; Python's `zipfile` decrypts ZipCrypto very s
 
 ```bash
 mkdir -p ~/stylify-data/raw/deepfashion2 && cd ~/stylify-data/raw/deepfashion2
-unzip -q -P '<password>' ~/Downloads/train.zip
-unzip -q -P '<password>' ~/Downloads/validation.zip
+unzip -q ~/Downloads/train.zip
+unzip -q ~/Downloads/validation.zip
 ```
 
 The Hugging Face datasets are parquet files. One way to unpack them, run from any empty folder (shown for Myntra; the shoe datasets work the same way with `huggingface_hub`):
@@ -83,9 +83,9 @@ uv run python -m stylify_ml.export   --placeholder --out ../mobile/assets/model 
   - Crops every labelled item: DeepFashion2 boxes, and the MultiModal footwear, headwear and bag masks. Web photos are used whole.
   - Resizes the long side to 256 and writes `manifest.csv`. It empties `crops/` first.
   - Skips crops under 64 px on the short side, heavily occluded DeepFashion2 items, MultiModal bag slivers (narrower than 0.4 of their height), and duplicate web photos.
-  - Caps training crops at 8,000 per garment label (`--garment-cap`), and at 4,000 per source for each of shoes, hats and bags (`--accessory-cap`). Validation is not capped.
+  - Caps training crops at 8,000 per garment label (`--garment-cap`), and at 4,000 from MultiModal and 4,000 from all web photos together, for each of shoes, hats and bags (`--accessory-cap`). Validation is not capped.
   - Splits: DeepFashion2 keeps its own train/validation split. MultiModal and web photos split 85/15 by a stable hash of the item ID or image hash.
-  - Run it after any change to `raw/`, then delete `raw/deepfashion2/`.
+  - Rebuilds everything from `raw/`, so it needs `raw/deepfashion2/` on every run: re-unzip DeepFashion2 before each `prepare`, then delete it again. It stops with an error, before touching `crops/`, if `raw/deepfashion2/` (train and validation), `raw/multimodal/parsing/` or a `raw/web/<label>` folder name is missing or wrong.
 - **`train`**:
   - Two phases: 3 epochs training only the new 9-output layer (learning rate 1e-3), then 12 epochs on the whole network (1e-4).
   - AdamW with a cosine schedule, label smoothing 0.1, batch 64, MPS. Each label is sampled equally often.
@@ -97,18 +97,18 @@ uv run python -m stylify_ml.export   --placeholder --out ../mobile/assets/model 
   - Writes everything to `metrics.json`.
 - **`export`**:
   - Lowers `best.pt` to ExecuTorch with XNNPACK (float32, input `[1, 3, 224, 224]`).
-  - Fails if any logit differs from PyTorch's by more than 1e-3 on validation crops.
+  - Fails if any logit differs from PyTorch's by more than 1e-3 on 16 validation crops.
   - Writes `classifier.json` with the run, the threshold and the scores.
 
 **Training must not sleep.** Runs have no resume. A Mac that sleeps mid-run (lid closed, or low battery) can kill the DataLoader workers and lose the run, as happened on 2026-10-19. Keep the Mac on power with the lid open, and wrap long commands in `caffeinate -i`.
 
 ## Retrain and ship a model
 
-1. Add or change data under `raw/` or `personal/`. Re-unzip DeepFashion2 if `prepare` needs it.
+1. Add or change data under `raw/` or `personal/`. Re-unzip DeepFashion2: `prepare` needs it every run.
 2. `prepare`, then `train` each candidate, then `evaluate` each run, then `evaluate --compare`.
 3. Pick the winner: the best personal top-1 among models whose `.pte` is 20 MB or less, with validation balanced accuracy as the tie-break.
 4. `export` the winner to `../mobile/assets/model`. Commit both files.
-5. Rebuild the iPhone app so it bundles the new model (`docs/mobile.md`). The app reads the labels, preprocessing and threshold from `classifier.json`. A threshold of 1.0 or more means "never pre-fill".
+5. Rebuild the iPhone app so it bundles the new model (`docs/mobile.md`). The app does not read `classifier.json` yet; it will once Plan B lands, taking the labels, preprocessing and threshold from it. A threshold of 1.0 or more means "never pre-fill".
 
 The `.pte` is about 17 MB. If retraining becomes frequent, move it to Git LFS.
 
@@ -122,9 +122,9 @@ Comparison on 2026-10-22, on the same crops (115,234; 2026-10-21 `prepare`) and 
 |---|---|---|---|---|---|---|
 | **mobilenet_v3_large** | 0.917 | 0.889 | **0.812** (13/16) | **1.000** | 0.579 | 16.9 MB |
 | efficientnet_b0 | 0.930 | 0.901 | 0.625 (10/16) | 0.938 | 0.536 | 16.1 MB |
-| mobilenetv4_conv_medium | not trained | | | | | 33.6 MB |
+| mobilenetv4_conv_medium | not trained | | | | | 33.6 MB (measured from a test export) |
 
-- `mobilenetv4_conv_medium` was dropped because its `.pte` is over the 20 MB limit, so the selection rule excludes it whatever it scores.
+- `mobilenetv4_conv_medium` was not trained: its `.pte` was 33.6 MB in a test export on 2026-10-17/18, over the 20 MB limit, so the selection rule excludes it whatever it scores.
 - Earlier runs in `--compare` (2026-10-18 and 10-19) were trained before the web photos and scored on fewer personal photos, so their numbers are not comparable.
 - Before the web photos, both models missed both of the owner's shoes and both hats. The owner's NY cap was called `top` at 0.85–0.88, above the threshold.
 

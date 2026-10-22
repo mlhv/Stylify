@@ -103,7 +103,7 @@ Nine labels, in this output order:
 | 7 | `hat` | Hat | (none) | headwear, plus web product photos |
 | 8 | `bag` | Bag | (none) | bag, plus web product photos |
 
-Garments come from DeepFashion2 only: its customer photos are closer to phone photos, and MultiModal's `pants` mixes trousers and shorts.
+Garments come from DeepFashion2 only (web photos may be added for any label under `raw/web/`): its customer photos are closer to phone photos, and MultiModal's `pants` mixes trousers and shorts.
 
 ## Part 1: the model pipeline (`ml/`)
 
@@ -140,6 +140,8 @@ Garments come from DeepFashion2 only: its customer photos are closer to phone ph
 - `manifest.csv` columns: `path, label, source (df2|mm|web), split (train|val), group (item ID), origin (shop|user|studio|web)`.
 - Splits: DeepFashion2 keeps its own train and validation split. Its `pair_id` numbering is separate in each split, so `group` is `df2:<split>:<pair_id>`. MultiModal is split 85/15 by item ID, parsed from the file name (for example `id_00000080`; confirm the format once the images are downloaded), with `group` `mm:<item ID>`, so one product's photos never appear on both sides.
 - Balance: at most 8,000 training crops per garment label, chosen at random with a fixed seed. Validation is not capped. Shoes, hats and bags are capped per (label, source): at most 4,000 training crops from MultiModal and 4,000 from web photos for each, so about half the shoes are on feet and half are not.
+- Inputs are checked before anything is deleted: `raw/deepfashion2/{train,validation}/annos`, `raw/multimodal/parsing` and the `raw/web/<label>` folder names. A missing folder or unknown label raises an error and leaves `crops/` and `manifest.csv` as they were.
+- MultiModal bag boxes narrower than 0.4 of their height (`BAG_MIN_ASPECT`) are dropped as slivers at the frame edge.
 - The script prints counts per label, source and split.
 
 ### `train.py`
