@@ -21,7 +21,7 @@ def _fake_data(root):
     data = root / "data"
     rows = []
     for label, colour in zip(LABELS, COLOURS):
-        for split, n in (("train", 2), ("val", 1)):
+        for split, n in (("train", 2), ("val", 1), ("test", 1)):
             for i in range(n):
                 rel = f"crops/{label}_{split}_{i}.png"
                 (data / "crops").mkdir(parents=True, exist_ok=True)
@@ -51,9 +51,9 @@ def test_train_then_evaluate_then_compare(tiny_run):
     assert config["data"] == str(data) and config["run_id"] == "t1" and config["device"] == "cpu"
     assert config["amp"] is False
     m = evaluate(run, data)
-    assert set(m) == {"val", "personal", "threshold", "pteBytes"}
+    assert set(m) == {"val", "users", "personal", "threshold", "pteBytes"}
     assert 0.0 <= m["threshold"] <= 1.0 and m["personal"] is not None
-    assert m["val"]["n"] == 9 and m["personal"]["n"] == 9
+    assert m["val"]["n"] == 9 and m["users"]["n"] == 9 and m["personal"]["n"] == 9
     table = compare(data)
     assert "t1" in table
     cached = json.loads((run / "metrics.json").read_text())["pteBytes"]
@@ -90,7 +90,9 @@ def test_export_run_writes_both_files(tiny_run, tmp_path):
     assert meta["threshold"] == metrics["threshold"]
     assert meta["scores"] == {"valBalancedAccuracy": metrics["val"]["balanced_accuracy"],
                               "personalTop1": metrics["personal"]["top1"],
-                              "personalTop3": metrics["personal"]["top3"]}
+                              "personalTop3": metrics["personal"]["top3"],
+                              "usersTop1": metrics["users"]["top1"],
+                              "usersTop3": metrics["users"]["top3"]}
 
 
 def test_export_run_writes_nothing_when_parity_fails(tiny_run, tmp_path, monkeypatch):

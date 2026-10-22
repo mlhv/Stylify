@@ -1,4 +1,4 @@
-"""Score a trained run on val and personal photos, and compare runs side by side."""
+"""Score a trained run on val, the clothing dataset's test half ("users") and personal photos, and compare runs."""
 
 from __future__ import annotations
 
@@ -41,8 +41,11 @@ def evaluate(run: Path, data: Path, device: str | None = None) -> dict:
     val = DataLoader(ManifestDataset(data, "val", eval_transform()), batch_size=BATCH_SIZE)
     val_probs, val_targets = predict(model, val, device)
     personal = _personal_probs(model, data, device)
+    test_set = ManifestDataset(data, "test", eval_transform())
+    users = predict(model, DataLoader(test_set, batch_size=BATCH_SIZE), device) if len(test_set) else None
     metrics = {
         "val": summarise(val_probs, val_targets),
+        "users": summarise(*users) if users is not None else None,
         "personal": summarise(*personal) if personal is not None else None,
         "threshold": pick_threshold(val_probs, val_targets),
         "pteBytes": None,
@@ -68,7 +71,8 @@ def _fmt(value: float | None) -> str:
 
 
 def compare(data: Path) -> str:
-    header = ("run", "model", "val bacc", "personal top1", "personal top3", "threshold", ".pte MB")
+    header = ("run", "model", "val bacc", "users top1", "users top3", "personal top1", "personal top3",
+              "threshold", ".pte MB")
     rows = [header]
     for metrics_path in sorted(Path(data).glob("runs/*/metrics.json")):
         run = metrics_path.parent
@@ -76,10 +80,13 @@ def compare(data: Path) -> str:
         config_path = run / "config.json"
         model = json.loads(config_path.read_text())["model_name"] if config_path.exists() else "?"
         personal = metrics["personal"]
+        users = metrics.get("users")
         rows.append((
             run.name,
             model,
             _fmt(metrics["val"]["balanced_accuracy"]),
+            _fmt(users["top1"] if users else None),
+            _fmt(users["top3"] if users else None),
             _fmt(personal["top1"] if personal else None),
             _fmt(personal["top3"] if personal else None),
             _fmt(metrics["threshold"]),
@@ -101,8 +108,9 @@ def main(argv: list[str] | None = None) -> None:
         print(compare(args.data))
     else:
         m = evaluate(args.run, args.data, args.device)
-        personal = m["personal"]
+        personal, users = m["personal"], m["users"]
         print(f"val balanced accuracy {m['val']['balanced_accuracy']:.4f}, threshold {m['threshold']:.4f}, "
+              f"users top-1 {_fmt(users['top1'] if users else None)}, "
               f"personal top-1 {_fmt(personal['top1'] if personal else None)}")
 
 

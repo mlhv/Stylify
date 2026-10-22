@@ -48,7 +48,8 @@ def test_placeholder_cli(tmp_path):
     meta = json.loads((tmp_path / "classifier.json").read_text())
     assert meta["threshold"] == 1.0 and meta["model"] == "placeholder"
     assert meta["run"] is None
-    assert meta["scores"] == {"valBalancedAccuracy": None, "personalTop1": None, "personalTop3": None}
+    assert meta["scores"] == {"valBalancedAccuracy": None, "personalTop1": None, "personalTop3": None,
+                              "usersTop1": None, "usersTop3": None}
     assert (tmp_path / "classifier.pte").stat().st_size > 0
 
 

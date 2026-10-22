@@ -1,8 +1,10 @@
-"""Build the crop cache and manifest.csv from raw DeepFashion2, DeepFashion-MultiModal and web product photos."""
+"""Build the crop cache and manifest.csv from raw DeepFashion2, DeepFashion-MultiModal, web product photos
+and the clothing dataset (volunteers' own photos)."""
 
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import shutil
 from collections import Counter
@@ -13,7 +15,7 @@ import numpy as np
 from PIL import Image
 
 from .boxes import Box, mask_box, short_side, widen
-from .labels import DF2_CATEGORY_TO_LABEL, LABELS, MM_CLASS_TO_LABEL
+from .labels import CLOTHING_LABEL_TO_LABEL, DF2_CATEGORY_TO_LABEL, LABELS, MM_CLASS_TO_LABEL
 from .manifest import Row, cap_per_label, mm_item_id, mm_split, write_manifest
 
 GARMENT_LABELS = {"top", "outerwear", "trousers", "shorts", "skirt", "dress"}
@@ -21,10 +23,12 @@ ACCESSORY_LABELS = {"shoes", "hat", "bag"}
 LONG_SIDE = 256
 JPEG_QUALITY = 90
 WEB_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+CLOTHING_OVERRIDES = Path(__file__).with_name("clothing_overrides.csv")
+CLOTHING_TEST_FRACTION = 0.5  # of photographers; their photos form the "test" split
 BAG_MIN_ASPECT = 0.4  # bag crops narrower than this sit at the frame edge and are mostly arm and torso
 SUMMARY_KEYS = (
     "crops", "skipped_occluded", "skipped_small", "skipped_degenerate",
-    "skipped_sliver", "skipped_duplicate", "skipped_unreadable", "skipped_missing", "skipped_unknown_category", "dropped_by_cap",
+    "skipped_sliver", "skipped_duplicate", "skipped_unlabelled", "skipped_unreadable", "skipped_missing", "skipped_unknown_category", "dropped_by_cap",
 )
 
 
@@ -182,6 +186,57 @@ def _collect_web(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
     return pending
 
 
+def read_overrides(path: Path) -> dict[str, str]:
+    """image id -> label or "drop", checked against LABELS."""
+    with path.open(newline="") as f:
+        overrides = {r["image"]: r["label"] for r in csv.DictReader(f)}
+    bad = sorted({v for v in overrides.values() if v != "drop" and v not in LABELS})
+    if bad:
+        raise ValueError(f"{path.name}: unknown labels {bad}")
+    return overrides
+
+
+def clothing_split(sender_id: str) -> str:
+    """Stable 50/50 split by photographer, so one person's room and lighting never straddle train and test."""
+    return "test" if mm_split(f"clothing:{sender_id}", CLOTHING_TEST_FRACTION) == "val" else "train"
+
+
+def _collect_clothing(data: Path, min_side: int, counts: Counter) -> list[_Pending]:
+    """The clothing dataset: raw/clothing/images.csv and raw/clothing/images/<image>.jpg, used whole."""
+    pending: list[_Pending] = []
+    base = data / "raw" / "clothing"
+    if not (base / "images.csv").exists():
+        return pending
+    overrides = read_overrides(CLOTHING_OVERRIDES)
+    with (base / "images.csv").open(newline="") as f:
+        records = sorted(csv.DictReader(f), key=lambda r: r["image"])
+    for record in records:
+        image_id = record["image"]
+        label = overrides.get(image_id, CLOTHING_LABEL_TO_LABEL.get(record["label"]))
+        if label is None or label == "drop":
+            counts["skipped_unlabelled"] += 1
+            continue
+        path = base / "images" / f"{image_id}.jpg"
+        if not path.exists():
+            counts["skipped_missing"] += 1
+            continue
+        image = _open_rgb(path)
+        if image is None:
+            counts["skipped_unreadable"] += 1
+            continue
+        width, height = image.size
+        if min(width, height) < min_side:
+            counts["skipped_small"] += 1
+            continue
+        split = clothing_split(record["sender_id"])
+        row = Row(
+            path=f"crops/{label}/clothing-{split}-{image_id}.jpg",
+            label=label, source="clothing", split=split, group=f"clothing:{record['sender_id']}", origin="user",
+        )
+        pending.append(_Pending(row, path, (0, 0, width, height)))
+    return pending
+
+
 def _write_crops(data: Path, pending: list[_Pending], counts: Counter) -> list[_Pending]:
     """Write each crop; return the pending items that were written (undecodable images are left out)."""
     written: list[_Pending] = []
@@ -236,6 +291,8 @@ def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64, accessory_c
     pending = _collect_df2(data, min_side, counts) + _collect_mm(data, min_side, counts)
     pending += _collect_web(data, min_side, counts)  # last, so the garment cap draws the same rows as before
 
+    clothing = _collect_clothing(data, min_side, counts)  # never capped, so the rows above are drawn as before
+
     kept_rows = cap_per_label([p.row for p in pending], garment_cap, GARMENT_LABELS)
     # accessories are capped per (label, source) so on-body MultiModal crops and web photos each fill their own budget
     for label in sorted(ACCESSORY_LABELS):
@@ -245,7 +302,7 @@ def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64, accessory_c
             kept_rows = [r for r in kept_rows if r not in dropped]
     kept = set(kept_rows)
     counts["dropped_by_cap"] = len(pending) - len(kept_rows)
-    pending = [p for p in pending if p.row in kept]
+    pending = [p for p in pending if p.row in kept] + clothing
 
     pending = _write_crops(data, pending, counts)
     write_manifest(data / "manifest.csv", [p.row for p in pending])
@@ -255,9 +312,9 @@ def prepare(data: Path, garment_cap: int = 8000, min_side: int = 64, accessory_c
 
 def _print_table(rows) -> None:
     table = Counter((r.label, r.split) for r in rows)
-    print(f"{'label':<12}{'train':>8}{'val':>8}")
+    print(f"{'label':<12}{'train':>8}{'val':>8}{'test':>8}")
     for label in LABELS:
-        print(f"{label:<12}{table[(label, 'train')]:>8}{table[(label, 'val')]:>8}")
+        print(f"{label:<12}{table[(label, 'train')]:>8}{table[(label, 'val')]:>8}{table[(label, 'test')]:>8}")
 
 
 def main(argv: list[str] | None = None) -> None:

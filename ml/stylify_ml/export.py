@@ -91,7 +91,8 @@ def _export_placeholder(out_dir: Path) -> None:
     torch.nn.init.zeros_(last.weight)
     torch.nn.init.zeros_(last.bias)
     _export_to(out_dir, model, torch.rand(2, 3, INPUT_SIZE, INPUT_SIZE), threshold=1.0, name="placeholder",
-               run=None, scores={"valBalancedAccuracy": None, "personalTop1": None, "personalTop3": None})
+               run=None, scores={"valBalancedAccuracy": None, "personalTop1": None, "personalTop3": None,
+                       "usersTop1": None, "usersTop3": None})
 
 
 def _export_run(run: Path, out_dir: Path) -> None:
@@ -106,10 +107,13 @@ def _export_run(run: Path, out_dir: Path) -> None:
         raise ValueError(f"no val rows in {data / 'manifest.csv'} for the parity check")
     inputs = torch.stack([val[i][0] for i in range(min(16, len(val)))])
     personal = metrics["personal"]
+    users = metrics.get("users")  # absent in runs evaluated before the clothing dataset
     scores = {
         "valBalancedAccuracy": metrics["val"]["balanced_accuracy"],
         "personalTop1": personal["top1"] if personal else None,
         "personalTop3": personal["top3"] if personal else None,
+        "usersTop1": users["top1"] if users else None,
+        "usersTop3": users["top3"] if users else None,
     }
     _export_to(out_dir, model, inputs, threshold=metrics["threshold"], name=meta["model"],
                run=run.name, scores=scores)

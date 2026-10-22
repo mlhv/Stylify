@@ -8,7 +8,8 @@ import pytest
 from PIL import Image
 
 from stylify_ml.manifest import mm_item_id, mm_split, read_manifest
-from stylify_ml.prepare import dhash, prepare
+from stylify_ml import prepare as prepare_module
+from stylify_ml.prepare import clothing_split, dhash, prepare, read_overrides
 
 W, H = 300, 400
 
@@ -410,3 +411,90 @@ def test_shoe_cap_draws_the_same_rows_as_the_old_per_source_cap(raw):
     prepare(raw, accessory_cap=3)
     got = {r for r in read_manifest(raw / "manifest.csv") if r.source == "web" and r.label == "shoes"}
     assert got == expected
+
+
+def _senders():
+    """One photographer id that lands in train and one in test."""
+    by_split = {}
+    for n in range(100):
+        by_split.setdefault(clothing_split(str(n)), str(n))
+    return by_split["train"], by_split["test"]
+
+
+def _clothing(raw: Path, records: list[tuple[str, str, str]], overrides: str = "image,label\n", monkeypatch=None):
+    base = raw / "raw" / "clothing"
+    lines = ["image,sender_id,label,kids"] + [f"{i},{s},{label},False" for i, s, label in records]
+    (base / "images").mkdir(parents=True, exist_ok=True)
+    (base / "images.csv").write_text("\n".join(lines) + "\n")
+    for i, _, _ in records:
+        _jpg(base / "images" / f"{i}.jpg")
+    path = raw / "overrides.csv"
+    path.write_text(overrides)
+    monkeypatch.setattr(prepare_module, "CLOTHING_OVERRIDES", path)
+
+
+def _clothing_rows(raw: Path):
+    return {r.path.split("-", 2)[2].removesuffix(".jpg"): r
+            for r in read_manifest(raw / "manifest.csv") if r.source == "clothing"}
+
+
+def test_clothing_labels_overrides_and_drops(raw, monkeypatch):
+    train, _ = _senders()
+    _clothing(raw, [("a", train, "T-Shirt"), ("b", train, "Hoodie"), ("c", train, "Hoodie"),
+                    ("d", train, "Body"), ("e", train, "Pants"), ("f", train, "Blazer"), ("g", train, "Polo")],
+              overrides="image,label\nb,top\nc,outerwear\ng,drop\n", monkeypatch=monkeypatch)
+    summary = prepare(raw)
+    rows = _clothing_rows(raw)
+    assert {k: r.label for k, r in rows.items()} == {"a": "top", "b": "top", "c": "outerwear",
+                                                     "e": "trousers", "f": "outerwear"}
+    assert summary["skipped_unlabelled"] == 2  # Body has no mapping; g is dropped by override
+    with Image.open(raw / rows["a"].path) as img:
+        assert max(img.size) == 256
+
+
+def test_unsorted_hoodie_is_dropped(raw, monkeypatch):
+    train, _ = _senders()
+    _clothing(raw, [("h", train, "Hoodie")], monkeypatch=monkeypatch)
+    assert prepare(raw)["skipped_unlabelled"] == 1
+    assert _clothing_rows(raw) == {}
+
+
+def test_clothing_splits_by_photographer(raw, monkeypatch):
+    train, test = _senders()
+    _clothing(raw, [("a", train, "Dress"), ("b", train, "Hat"), ("c", test, "Dress"), ("d", test, "Shoes")],
+              monkeypatch=monkeypatch)
+    prepare(raw, garment_cap=1, accessory_cap=1)  # caps never touch clothing rows
+    rows = _clothing_rows(raw)
+    assert {k: r.split for k, r in rows.items()} == {"a": "train", "b": "train", "c": "test", "d": "test"}
+    assert rows["a"].group == f"clothing:{train}" and rows["c"].group == f"clothing:{test}"
+    assert {(r.source, r.origin) for r in rows.values()} == {("clothing", "user")}
+    assert rows["c"].path == "crops/dress/clothing-test-c.jpg"
+
+
+def test_clothing_split_is_stable_and_about_half():
+    splits = [clothing_split(str(n)) for n in range(2000)]
+    assert splits == [clothing_split(str(n)) for n in range(2000)]
+    assert set(splits) == {"train", "test"}
+    assert 0.45 < splits.count("test") / len(splits) < 0.55
+
+
+def test_clothing_does_not_change_other_rows(raw, monkeypatch):
+    monkeypatch.setattr(prepare_module, "CLOTHING_OVERRIDES", raw / "none.csv")
+    prepare(raw, garment_cap=1)
+    without = set(read_manifest(raw / "manifest.csv"))
+    train, test = _senders()
+    _clothing(raw, [(f"t{n}", train if n % 2 else test, "T-Shirt") for n in range(6)], monkeypatch=monkeypatch)
+    prepare(raw, garment_cap=1)
+    with_clothing = {r for r in read_manifest(raw / "manifest.csv") if r.source != "clothing"}
+    assert without == with_clothing and without
+
+
+def test_overrides_reject_unknown_labels(tmp_path):
+    path = tmp_path / "o.csv"
+    path.write_text("image,label\na,jumper\nb,drop\nc,top\n")
+    with pytest.raises(ValueError, match="jumper"):
+        read_overrides(path)
+
+
+def test_shipped_overrides_are_valid():
+    read_overrides(prepare_module.CLOTHING_OVERRIDES)
