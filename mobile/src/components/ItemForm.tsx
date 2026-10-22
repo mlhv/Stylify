@@ -110,6 +110,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
       const uri = await pickPhoto(source)
       if (uri) {
         setPhotoUri(uri)
+        setChips([])
         start(uri)
         setError(null)
       }

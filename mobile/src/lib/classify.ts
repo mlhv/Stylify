@@ -45,8 +45,22 @@ function base64ToBytes(base64: string): Uint8Array {
   return bytes
 }
 
+// The native classifier throws RESOURCE_BUSY if it is used while running, so runs go one after
+// another. A failed run must not block the next one.
+let queue: Promise<unknown> = Promise.resolve()
+
+function serialised<T>(task: () => Promise<T>): Promise<T> {
+  const result = queue.then(task, task)
+  queue = result.catch(() => {})
+  return result
+}
+
 // Returns the top three labels for a local photo, with the confidence threshold for pre-filling.
-export async function classifyPhoto(uri: string): Promise<ClassifyResult> {
+export function classifyPhoto(uri: string): Promise<ClassifyResult> {
+  return serialised(() => runClassify(uri))
+}
+
+async function runClassify(uri: string): Promise<ClassifyResult> {
   const started = Date.now()
   const { classifier, config } = await getClassifier()
 

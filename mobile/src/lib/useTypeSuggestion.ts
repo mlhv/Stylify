@@ -16,7 +16,8 @@ export function useTypeSuggestion(onResult: (result: ClassifyResult) => void) {
     })
   }
 
-  // After unmount, further state updates would be pointless; start() becomes a no-op.
+  // start() does nothing after unmount. A run already in flight still finishes and may set state;
+  // React ignores that on an unmounted component.
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true

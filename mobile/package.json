@@ -22,6 +22,7 @@
     "expo": "~55.0.31",
     "expo-auth-session": "~55.0.18",
     "expo-build-properties": "~55.0.18",
+    "expo-asset": "55.0.20",
     "expo-constants": "~55.0.17",
     "expo-crypto": "~55.0.19",
     "expo-device": "~55.0.21",
