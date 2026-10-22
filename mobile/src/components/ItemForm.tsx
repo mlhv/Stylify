@@ -96,10 +96,16 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
   // Type suggestions. onResult reads the field when the classifier finishes, so a type typed in the meantime is kept.
   const [chips, setChips] = useState<string[]>([])
   const lastPrefill = useRef<string | null>(null)
+  // setFieldValue does not run the field's validators, so an old error would stay under the new value.
+  function setType(value: string) {
+    form.setFieldValue('type', value)
+    void form.validateField('type', 'change')
+  }
+
   const { pending, start } = useTypeSuggestion((result) => {
     const d = decide(result.predictions, result.threshold, form.getFieldValue('type'), lastPrefill.current)
     if (d.prefill) {
-      form.setFieldValue('type', d.prefill)
+      setType(d.prefill)
       lastPrefill.current = d.prefill
     }
     setChips(d.chips)
@@ -160,7 +166,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
                 }}>
                 <Text className="text-sm font-medium text-neutral-700">{label}</Text>
                 <TextInput
-                  className="rounded-lg border border-neutral-300 px-3 py-3 text-base"
+                  className="rounded-lg border border-neutral-300 px-3 py-3 text-[16px]"
                   value={field.state.value}
                   onFocus={() => {
                     focusedField.current = name
@@ -191,7 +197,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
                             className={`rounded-full px-3 py-1 ${selected ? 'bg-neutral-900' : 'bg-neutral-200'}`}
                             accessibilityRole="button"
                             accessibilityLabel={`Set type to ${chip}`}
-                            onPress={() => form.setFieldValue('type', chip)}>
+                            onPress={() => setType(chip)}>
                             <Text className={selected ? 'text-white' : undefined}>{chip}</Text>
                           </Pressable>
                         )
