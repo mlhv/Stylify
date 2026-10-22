@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -17,18 +18,28 @@ from stylify_ml.models import MODEL_NAMES, build_model, head_parameters, save_ch
 
 
 def default_device() -> str:
+    if torch.cuda.is_available():
+        return "cuda"
     return "mps" if torch.backends.mps.is_available() else "cpu"
 
 
-def _train_epoch(model, loader, loss_fn, optimiser, device) -> float:
+def _train_epoch(model, loader, loss_fn, optimiser, device, scaler=None) -> float:
+    """One pass over `loader`. With a `scaler`, runs in float16 mixed precision (CUDA only)."""
     model.train()
     total, count = 0.0, 0
     for x, y in loader:
-        x, y = x.to(device), y.to(device)
+        x, y = x.to(device, non_blocking=True), y.to(device, non_blocking=True)
         optimiser.zero_grad()
-        loss = loss_fn(model(x), y)
-        loss.backward()
-        optimiser.step()
+        amp = torch.autocast("cuda", dtype=torch.float16) if scaler else contextlib.nullcontext()
+        with amp:
+            loss = loss_fn(model(x), y)
+        if scaler:
+            scaler.scale(loss).backward()
+            scaler.step(optimiser)
+            scaler.update()
+        else:
+            loss.backward()
+            optimiser.step()
         total += loss.item() * len(y)
         count += len(y)
     return total / count if count else 0.0
@@ -50,10 +61,17 @@ def predict(model, loader, device) -> tuple[np.ndarray, np.ndarray]:
 def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e-3,
           full_epochs: int = 12, full_lr: float = 1e-4, batch_size: int = 64,
           label_smoothing: float = 0.1, pretrained: bool = True, device: str | None = None,
-          run_id: str | None = None, workers: int = 4) -> Path:
-    """Train `model_name` on `data/manifest.csv` and return the run directory `data/runs/<run_id>/`."""
+          run_id: str | None = None, workers: int = 4, amp: bool | None = None) -> Path:
+    """Train `model_name` on `data/manifest.csv` and return the run directory `data/runs/<run_id>/`.
+
+    `amp` (float16 mixed precision) defaults to on for CUDA and must be off elsewhere.
+    """
     data = Path(data).resolve()
     device = device or default_device()
+    cuda = device.startswith("cuda")
+    amp = cuda if amp is None else amp
+    if amp and not cuda:
+        raise ValueError(f"mixed precision needs a CUDA device, not {device}")
     run_id = run_id or f"{datetime.now(timezone.utc):%Y%m%d-%H%M%S}-{model_name}"
     run = data / "runs" / run_id
     run.mkdir(parents=True, exist_ok=False)  # never overwrite a run
@@ -62,7 +80,7 @@ def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e
         "data": str(data), "model_name": model_name, "head_epochs": head_epochs, "head_lr": head_lr,
         "full_epochs": full_epochs, "full_lr": full_lr, "batch_size": batch_size,
         "label_smoothing": label_smoothing, "pretrained": pretrained, "device": device,
-        "run_id": run_id, "workers": workers,
+        "run_id": run_id, "workers": workers, "amp": amp,
     }
     (run / "config.json").write_text(json.dumps(config, indent=2) + "\n")
 
@@ -71,9 +89,11 @@ def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e
     if not len(train_ds) or not len(val_ds):
         raise ValueError(f"manifest needs train and val rows (train={len(train_ds)}, val={len(val_ds)})")
     # drop_last avoids a final batch of one, which BatchNorm in train mode rejects.
+    loader_args = {"num_workers": workers, "pin_memory": cuda, "persistent_workers": workers > 0}
     train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=balanced_sampler(train_ds),
-                              num_workers=workers, drop_last=len(train_ds) > batch_size)
-    val_loader = DataLoader(val_ds, batch_size=batch_size, num_workers=workers)
+                              drop_last=len(train_ds) > batch_size, **loader_args)
+    val_loader = DataLoader(val_ds, batch_size=batch_size, **loader_args)
+    scaler = torch.amp.GradScaler("cuda") if amp else None
 
     model = build_model(model_name, pretrained=pretrained).to(device)
     loss_fn = torch.nn.CrossEntropyLoss(label_smoothing=label_smoothing)
@@ -93,7 +113,7 @@ def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e
             optimiser = torch.optim.AdamW(params, lr=lr)
             scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimiser, T_max=max(epochs, 1))
             for epoch in range(1, epochs + 1):
-                train_loss = _train_epoch(model, train_loader, loss_fn, optimiser, device)
+                train_loss = _train_epoch(model, train_loader, loss_fn, optimiser, device, scaler)
                 scheduler.step()
                 probs, targets = predict(model, val_loader, device)
                 val_bacc = balanced_accuracy(probs, targets)
@@ -119,14 +139,16 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--batch-size", type=int, default=64)
     parser.add_argument("--label-smoothing", type=float, default=0.1)
     parser.add_argument("--no-pretrained", action="store_true")
-    parser.add_argument("--device", default=None, help="default: mps if available, else cpu")
+    parser.add_argument("--device", default=None, help="default: cuda, else mps, else cpu")
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=None,
+                        help="float16 mixed precision; default: on for cuda only")
     args = parser.parse_args(argv)
     run = train(args.data, args.model, head_epochs=args.head_epochs, head_lr=args.head_lr,
                 full_epochs=args.full_epochs, full_lr=args.full_lr, batch_size=args.batch_size,
                 label_smoothing=args.label_smoothing, pretrained=not args.no_pretrained,
-                device=args.device, run_id=args.run_id, workers=args.workers)
+                device=args.device, run_id=args.run_id, workers=args.workers, amp=args.amp)
     print(run)
 
 

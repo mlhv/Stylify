@@ -12,15 +12,14 @@ import torch
 from torch.utils.data import DataLoader
 
 from stylify_ml.data import ManifestDataset, eval_transform, load_image, load_personal
-from stylify_ml.export import export_pte
 from stylify_ml.metrics import pick_threshold, summarise
 from stylify_ml.models import load_checkpoint
-from stylify_ml.train import predict
+from stylify_ml.train import default_device, predict
 
 BATCH_SIZE = 32
 
 
-def _personal_probs(model, data: Path) -> tuple[np.ndarray, np.ndarray] | None:
+def _personal_probs(model, data: Path, device: str) -> tuple[np.ndarray, np.ndarray] | None:
     items = load_personal(data)
     if not items:
         return None
@@ -29,17 +28,19 @@ def _personal_probs(model, data: Path) -> tuple[np.ndarray, np.ndarray] | None:
     with torch.no_grad():
         for start in range(0, len(items), BATCH_SIZE):
             batch = torch.stack([transform(load_image(p)) for p, _ in items[start:start + BATCH_SIZE]])
-            probs.append(torch.softmax(model(batch), dim=1).numpy())
+            probs.append(torch.softmax(model(batch.to(device)), dim=1).cpu().numpy())
     return np.concatenate(probs), np.array([i for _, i in items], dtype=int)
 
 
-def evaluate(run: Path, data: Path) -> dict:
-    """Write and return `run/metrics.json`. Runs on CPU."""
+def evaluate(run: Path, data: Path, device: str | None = None) -> dict:
+    """Write and return `run/metrics.json`. `device` defaults to cuda, else mps, else cpu."""
     run, data = Path(run), Path(data)
+    device = device or default_device()
     model, _ = load_checkpoint(run / "best.pt")
+    model.to(device)
     val = DataLoader(ManifestDataset(data, "val", eval_transform()), batch_size=BATCH_SIZE)
-    val_probs, val_targets = predict(model, val, "cpu")
-    personal = _personal_probs(model, data)
+    val_probs, val_targets = predict(model, val, device)
+    personal = _personal_probs(model, data, device)
     metrics = {
         "val": summarise(val_probs, val_targets),
         "personal": summarise(*personal) if personal is not None else None,
@@ -53,6 +54,8 @@ def evaluate(run: Path, data: Path) -> dict:
 def _pte_bytes(run: Path, metrics: dict) -> int:
     """Export once to a temp file and cache the size in metrics.json."""
     if metrics.get("pteBytes") is None:
+        from stylify_ml.export import export_pte  # ExecuTorch is only installed where models are exported
+
         model, _ = load_checkpoint(run / "best.pt")
         with tempfile.TemporaryDirectory() as tmp:
             metrics["pteBytes"] = export_pte(model, Path(tmp) / "classifier.pte")
@@ -92,11 +95,12 @@ def main(argv: list[str] | None = None) -> None:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--run", type=Path, help="run directory to evaluate")
     mode.add_argument("--compare", action="store_true", help="print a table of every evaluated run")
+    parser.add_argument("--device", default=None, help="default: cuda, else mps, else cpu")
     args = parser.parse_args(argv)
     if args.compare:
         print(compare(args.data))
     else:
-        m = evaluate(args.run, args.data)
+        m = evaluate(args.run, args.data, args.device)
         personal = m["personal"]
         print(f"val balanced accuracy {m['val']['balanced_accuracy']:.4f}, threshold {m['threshold']:.4f}, "
               f"personal top-1 {_fmt(personal['top1'] if personal else None)}")

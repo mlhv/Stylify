@@ -1,14 +1,17 @@
 import json
 import shutil
+import subprocess
+import sys
 
 import pytest
+import torch
 from PIL import Image
 
 from stylify_ml import export
 from stylify_ml.evaluate import compare, evaluate
 from stylify_ml.labels import LABELS
 from stylify_ml.manifest import Row, write_manifest
-from stylify_ml.train import train
+from stylify_ml.train import default_device, train
 
 COLOURS = [(220, 20, 20), (20, 220, 20), (20, 20, 220), (220, 220, 20), (220, 20, 220),
            (20, 220, 220), (240, 240, 240), (15, 15, 15), (128, 64, 0)]
@@ -46,6 +49,7 @@ def test_train_then_evaluate_then_compare(tiny_run):
     assert [(e["phase"], e["epoch"]) for e in epochs] == [("head", 1), ("full", 1)]
     config = json.loads((run / "config.json").read_text())
     assert config["data"] == str(data) and config["run_id"] == "t1" and config["device"] == "cpu"
+    assert config["amp"] is False
     m = evaluate(run, data)
     assert set(m) == {"val", "personal", "threshold", "pteBytes"}
     assert 0.0 <= m["threshold"] <= 1.0 and m["personal"] is not None
@@ -112,3 +116,33 @@ def test_placeholder_writes_nothing_when_parity_fails(tmp_path, monkeypatch):
     with pytest.raises(export.ParityError):
         export.main(["--placeholder", "--out", str(tmp_path)])
     assert not (tmp_path / "classifier.json").exists() and not (tmp_path / "classifier.pte").exists()
+
+
+def test_default_device_prefers_cuda(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    assert default_device() == "cuda"
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    assert default_device() == "cpu"
+
+
+def test_mixed_precision_needs_cuda(tiny_run):
+    data, _ = tiny_run
+    with pytest.raises(ValueError, match="CUDA"):
+        train(data, "mobilenet_v3_large", pretrained=False, device="cpu", run_id="amp", amp=True, workers=0)
+    assert not (data / "runs" / "amp").exists()
+
+
+def test_evaluate_on_an_explicit_device(tiny_run, tmp_path):
+    data, run = tiny_run
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy)
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert m["val"]["n"] == 9 and m["personal"]["n"] == 9
+
+
+def test_train_and_evaluate_import_without_executorch():
+    # Kaggle has no ExecuTorch: training and evaluation must not import it.
+    code = "import sys; import stylify_ml.train, stylify_ml.evaluate; print('executorch' in sys.modules)"
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
+    assert out.stdout.strip() == "False"

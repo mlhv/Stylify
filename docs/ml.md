@@ -102,6 +102,33 @@ uv run python -m stylify_ml.export   --placeholder --out ../mobile/assets/model 
 
 **Training must not sleep.** Runs have no resume. A Mac that sleeps mid-run (lid closed, or low battery) can kill the DataLoader workers and lose the run, as happened on 2026-10-19. Keep the Mac on power with the lid open, and wrap long commands in `caffeinate -i`.
 
+## Training on Kaggle
+
+Training and evaluation can run on a free Kaggle GPU, which keeps running after the laptop is closed. `prepare` and `export` stay on the Mac: `prepare` needs the DeepFashion2 zips, and `export` needs ExecuTorch.
+
+One-time setup: a Kaggle account with a verified phone number (needed for GPUs and internet access), then `uvx kaggle auth login`.
+
+```bash
+# from ml/, after prepare; <user> is the Kaggle username
+uv run python -m stylify_ml.bundle --data ~/stylify-data --out ~/stylify-data/kaggle --owner <user>
+uvx kaggle datasets create -p ~/stylify-data/kaggle/data   # first time; later: datasets version -p ... -m "<what changed>"
+uvx kaggle datasets create -p ~/stylify-data/kaggle/code   # the same, after any change to stylify_ml/
+uvx kaggle kernels push -p ~/stylify-data/kaggle/kernel    # starts the run
+uvx kaggle kernels status <user>/stylify-train
+uvx kaggle kernels output <user>/stylify-train -p ~/stylify-data/kaggle/output
+mv ~/stylify-data/kaggle/output/runs/* ~/stylify-data/runs/
+uv run python -m stylify_ml.evaluate --data ~/stylify-data --compare
+```
+
+- **The bundle has three parts:**
+  - `data/` holds `crops.zip`, `manifest.csv` and `personal.zip`, with HEIC photos converted to lossless PNG because Kaggle cannot read HEIC;
+  - `code/` holds `stylify_ml.zip` and `job.json`, which lists the models to train (`--models`, default mobilenet and efficientnet);
+  - `kernel/` holds the script `stylify_ml/kaggle_kernel.py`, which trains and evaluates each model in turn on a T4 and writes `runs/` as the kernel's output.
+- **Both datasets must stay private.** The CLI creates them private; never pass `--public`. DeepFashion's licence forbids redistribution, and the personal photos are private.
+- **Wait for processing.** After uploading a new dataset version, wait until Kaggle has finished processing it before pushing the kernel, or the run sees the old version.
+- **Limits:** a run may last at most 12 hours, and free GPU time is 30 hours a week.
+- `train` and `evaluate` use CUDA when it is available, with float16 mixed precision for training (`--no-amp` turns it off).
+
 ## Retrain and ship a model
 
 1. Add or change data under `raw/` or `personal/`. Re-unzip DeepFashion2: `prepare` needs it every run.

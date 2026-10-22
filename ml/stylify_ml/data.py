@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
-import pillow_heif
 import torch
 from PIL import Image, ImageOps
 from torch.utils.data import Dataset, WeightedRandomSampler
@@ -14,7 +13,12 @@ from torchvision import transforms as T
 from .labels import LABELS, label_index
 from .manifest import Row, read_manifest
 
-pillow_heif.register_heif_opener()
+try:
+    import pillow_heif
+except ImportError:  # not installed on Kaggle; the bundle converts HEIC personal photos to PNG
+    pass
+else:
+    pillow_heif.register_heif_opener()
 
 MEAN = [0.485, 0.456, 0.406]
 STD = [0.229, 0.224, 0.225]
