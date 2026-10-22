@@ -126,7 +126,7 @@ Garments come from DeepFashion2 only (web photos may be added for any label unde
 
 ### Getting the data
 
-1. Unzip `train.zip` and `validation.zip` with `unzip -P` (fast; Python's `zipfile` decrypts ZipCrypto in pure Python). They need about 13 GB. `test.zip` can be deleted.
+1. Unzip `train.zip` and `validation.zip` with `unzip`, which prompts for the password (fast; Python's `zipfile` decrypts ZipCrypto in pure Python). `prepare.py` needs them on every run. They need about 13 GB. `test.zip` can be deleted.
 2. Download the MultiModal images and parsing masks.
 3. After `prepare.py` succeeds, delete `raw/deepfashion2/`. Keep the zips, so the cache can be rebuilt if the crop rules change.
 4. Photograph about 10 of Minh's own items per label into `personal/<label>/`.

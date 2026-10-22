@@ -85,7 +85,7 @@ uv run python -m stylify_ml.export   --placeholder --out ../mobile/assets/model 
   - Skips crops under 64 px on the short side, heavily occluded DeepFashion2 items, MultiModal bag slivers (narrower than 0.4 of their height), and duplicate web photos.
   - Caps training crops at 8,000 per garment label (`--garment-cap`), and at 4,000 from MultiModal and 4,000 from all web photos together, for each of shoes, hats and bags (`--accessory-cap`). Validation is not capped.
   - Splits: DeepFashion2 keeps its own train/validation split. MultiModal and web photos split 85/15 by a stable hash of the item ID or image hash.
-  - Rebuilds everything from `raw/`, so it needs `raw/deepfashion2/` on every run: re-unzip DeepFashion2 before each `prepare`, then delete it again. It stops with an error, before touching `crops/`, if `raw/deepfashion2/` (train and validation), `raw/multimodal/parsing/` or a `raw/web/<label>` folder name is missing or wrong.
+  - Rebuilds everything from `raw/`, so it needs `raw/deepfashion2/` on every run: re-unzip DeepFashion2 before each `prepare`, then delete it again. It stops with an error, before touching `crops/`, if `raw/deepfashion2/` (train and validation) or `raw/multimodal/parsing/` is missing, or if a folder under `raw/web/` is not one of the nine labels.
 - **`train`**:
   - Two phases: 3 epochs training only the new 9-output layer (learning rate 1e-3), then 12 epochs on the whole network (1e-4).
   - AdamW with a cosine schedule, label smoothing 0.1, batch 64, MPS. Each label is sampled equally often.
