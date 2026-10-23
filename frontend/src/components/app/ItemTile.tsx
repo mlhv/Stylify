@@ -16,9 +16,12 @@ export function ItemTile({ item, index }: { item: Item; index: number }) {
   return (
     <motion.div
       initial={reduce ? false : { opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      whileHover={reduce ? undefined : { y: -2 }}
-      transition={{ duration: reduce ? 0 : 0.3, delay: reduce ? 0 : Math.min(index * 0.04, 0.4) }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        transition: { duration: reduce ? 0 : 0.3, delay: reduce ? 0 : Math.min(index * 0.04, 0.4) },
+      }}
+      whileHover={reduce ? undefined : { y: -2, transition: { duration: 0.15 } }}
     >
       <Link
         to="/edit-item/$id"
@@ -27,7 +30,7 @@ export function ItemTile({ item, index }: { item: Item; index: number }) {
       >
         <div
           className="relative flex aspect-square items-center justify-center overflow-hidden rounded-3xl"
-          style={{ backgroundColor: bg, color: fg, boxShadow: `0 5px 0 0 ${fg}33` }}
+          style={{ backgroundColor: bg, color: fg, boxShadow: '0 5px 0 0 rgba(0,0,0,.08)' }}
         >
           {showPhoto ? (
             <img
