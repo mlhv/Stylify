@@ -10,11 +10,13 @@ import { TypeChip } from './TypeChip'
 
 type TextField = 'name' | 'type' | 'size' | 'color'
 
-const FIELDS: { name: TextField; label: string; placeholder: string }[] = [
-  { name: 'name', label: 'Name', placeholder: 'Zip hoodie' },
-  { name: 'type', label: 'Type', placeholder: 'Pick one below or type your own' },
-  { name: 'size', label: 'Size', placeholder: 'Like M or 32' },
-  { name: 'color', label: 'Colour', placeholder: 'Like black' },
+// `missing` replaces the shared schema's message; its only rule per field is
+// "not empty", so any error on a field means it was left blank.
+const FIELDS: { name: TextField; label: string; placeholder: string; missing: string }[] = [
+  { name: 'name', label: 'Name', placeholder: 'Zip hoodie', missing: 'Give it a name' },
+  { name: 'type', label: 'Type', placeholder: 'Pick one below or type your own', missing: 'Pick a type or type your own' },
+  { name: 'size', label: 'Size', placeholder: 'Like M or 32', missing: 'What size is it?' },
+  { name: 'color', label: 'Colour', placeholder: 'Like black', missing: 'What colour is it?' },
 ]
 
 // The Add and Edit form: photo, four fields, the nine type chips and submit.
@@ -79,7 +81,7 @@ export function ItemForm({
           ) : null}
         </div>
 
-        {FIELDS.map(({ name, label, placeholder }) => (
+        {FIELDS.map(({ name, label, placeholder, missing }) => (
           <form.Field key={name} name={name} validators={{ onChange: createItemSchema.shape[name] }}>
             {(field) => (
               <div className="flex flex-col gap-3">
@@ -92,7 +94,7 @@ export function ItemForm({
                   onChange={(e) => field.handleChange(e.target.value)}
                   error={
                     field.state.meta.isTouched && field.state.meta.errors.length
-                      ? field.state.meta.errors.join(', ')
+                      ? missing
                       : undefined
                   }
                 />
