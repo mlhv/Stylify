@@ -75,14 +75,16 @@ function StatusBar() {
   )
 }
 
-// Screens cross-fade, with or without reduced motion.
+// The incoming screen, opaque, fades in on top of the outgoing one, which holds
+// still underneath until it is removed: one clean dissolve, never two
+// half-transparent screens. Opacity only, so it is the same with reduced motion.
 function Screen({ children }: { children: ReactNode }) {
   return (
     <motion.div
-      className="absolute inset-0 top-8"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      className="absolute inset-0 top-8 bg-cream"
+      initial={{ opacity: 0, zIndex: 1 }}
+      animate={{ opacity: 1, zIndex: 1 }}
+      exit={{ opacity: 1, zIndex: 0 }}
       transition={{ duration: 0.35 }}
     >
       {children}
