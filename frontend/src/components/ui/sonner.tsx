@@ -2,6 +2,8 @@ import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
+// White, rounded toasts in the brand ink and Nunito; the only floating thing
+// that keeps a drop shadow.
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
@@ -10,12 +12,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
-          actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:rounded-2xl group-[.toaster]:border-2 group-[.toaster]:border-line group-[.toaster]:bg-white group-[.toaster]:font-sans group-[.toaster]:text-base group-[.toaster]:font-extrabold group-[.toaster]:text-ink group-[.toaster]:shadow-lg",
+          description: "group-[.toast]:font-bold group-[.toast]:text-muted",
+          actionButton: "group-[.toast]:bg-coral group-[.toast]:text-white",
+          cancelButton: "group-[.toast]:bg-line group-[.toast]:text-ink",
         },
       }}
       {...props}

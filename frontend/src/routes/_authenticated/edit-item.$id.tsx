@@ -1,13 +1,9 @@
-// In edit-item.tsx
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { useForm } from '@tanstack/react-form'
-import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { useState, useEffect, useCallback } from 'react'
 
 import {
+  deleteItem,
   editItem,
   getAllItemsQueryOptions,
   loadingEditItemQueryOptions,
@@ -16,9 +12,11 @@ import {
   getTotalClothesQueryOptions,
   ItemNotFoundError,
 } from '@/lib/api'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { zodValidator } from '@tanstack/zod-form-adapter'
-import { createItemSchema } from '@stylify/shared'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type createItem } from '@stylify/shared'
+import { ItemForm } from '@/components/app/ItemForm'
+import { ChunkyButton } from '@/components/app/ChunkyButton'
+import { ErrorPanel } from '@/components/app/ErrorPanel'
 
 export const Route = createFileRoute('/_authenticated/edit-item/$id')({
   component: EditItem,
@@ -29,8 +27,6 @@ function EditItem() {
   const itemId = parseInt(params.id, 10)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const [image, setImage] = useState<File | undefined>(undefined)
-  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined)
 
   // Fetch the current item data
   const { data: itemData, isLoading, error, refetch } = useQuery(
@@ -50,16 +46,7 @@ function EditItem() {
     }
   }, [itemIsGone, forgetItem])
 
-  const form = useForm({
-    validatorAdapter: zodValidator(),
-    defaultValues: {
-      name: '',
-      type: '',
-      size: '',
-      color: '',
-      imageUrl: '',
-    },
-    onSubmit: async ({ value }) => {
+  const onSubmit = async (value: createItem, image: File | undefined) => {
       const existingItems = await queryClient.ensureQueryData(
         getAllItemsQueryOptions,
       )
@@ -108,9 +95,7 @@ function EditItem() {
           ),
         })
 
-        toast('Item Updated', {
-          description: `Successfully updated item: ${updatedItem.name}`,
-        })
+        toast(`Saved ${updatedItem.name}`)
       } catch (error) {
         queryClient.setQueryData(loadingEditItemQueryOptions.queryKey, {
           item: undefined
@@ -118,261 +103,148 @@ function EditItem() {
 
         if (error instanceof ItemNotFoundError) {
           forgetItem()
-          toast('Item not updated', {
-            description: 'This item no longer exists',
+          toast('That piece is gone', {
+            description: 'It may have been deleted on another device.',
           })
         } else {
-          toast('An error occurred', {
-            description: 'Failed to update item',
-          })
+          toast("Couldn't save that piece. Try again?")
         }
       } finally {
         queryClient.setQueryData(loadingEditItemQueryOptions.queryKey, {})
       }
-    },
-  })
-
-  // Set initial form values when item data is loaded
-  useEffect(() => {
-    if (itemData?.item) {
-      // Use setValue for each field instead of reset
-      form.setFieldValue('name', itemData.item.name ?? '')
-      form.setFieldValue('type', itemData.item.type ?? '')
-      form.setFieldValue('size', itemData.item.size ?? '')
-      form.setFieldValue('color', itemData.item.color ?? '')
-      form.setFieldValue('imageUrl', itemData.item.imageUrl)
-      setImageUrl(itemData.item.imageUrl)
-    }
-  }, [itemData, form])
-
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const image = e.target.files?.[0]
-    setImage(image)
-
-    if (imageUrl) {
-      URL.revokeObjectURL(imageUrl)
-    }
-
-    if (image) {
-      const url = URL.createObjectURL(image)
-      setImageUrl(url)
-    }
   }
 
   if (isLoading) {
-    return <div>Loading...</div>
+    return <ItemFormSkeleton />
   }
 
   if (itemIsGone) {
     return (
-      <div className="max-w-md mx-auto mt-8">
-        <h1 className="text-2xl font-bold mb-4">This item no longer exists</h1>
-        <p className="mb-4">It may have been deleted on another device.</p>
-        <Button onClick={() => navigate({ to: '/' })}>Back to wardrobe</Button>
+      <div className="px-4 py-8">
+        <ErrorPanel
+          title="This piece is gone"
+          message="It may have been deleted on another device."
+          actionLabel="Back to closet"
+          onAction={() => navigate({ to: '/' })}
+        />
       </div>
     )
   }
 
-  if (error) {
+  if (error || !itemData) {
     return (
-      <div className="max-w-md mx-auto mt-8">
-        <h1 className="text-2xl font-bold mb-4">Could not load this item</h1>
-        <Button onClick={() => refetch()}>Try again</Button>
+      <div className="px-4 py-8">
+        <ErrorPanel
+          title="Couldn't load this piece"
+          message={error?.message ?? 'Something went wrong.'}
+          onAction={() => void refetch()}
+        />
       </div>
     )
   }
 
-  // Rest of the component JSX is similar to create-item.tsx
-  // You can copy the JSX from create-item.tsx and update the title to "Edit Clothing Item"
+  const { item } = itemData
   return (
-    <div className="max-w-md mx-auto mt-8">
-      <h1 className="text-2xl font-bold mb-4">Edit Clothing Item</h1>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          form.handleSubmit()
-        }}
-        className="space-y-4"
-      >
-        <div>
-          <form.Field
-            name="name"
-            validators={{
-              onChange: createItemSchema.shape.name,
-            }}
-          >
-            {(field) => (
-              <>
-                <Label htmlFor={field.name} className="block mb-1">
-                  Name:
-                </Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                />
-                {field.state.meta.isTouched &&
-                field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(', ')}</em>
-                ) : null}
-              </>
-            )}
-          </form.Field>
-        </div>
-        <div>
-          <form.Field
-            name="type"
-            validators={{
-              onChange: createItemSchema.shape.type,
-            }}
-          >
-            {(field) => (
-              <>
-                <Label htmlFor={field.name} className="block mb-1">
-                  Type:
-                </Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                />
-                {field.state.meta.isTouched &&
-                field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(', ')}</em>
-                ) : null}
-              </>
-            )}
-          </form.Field>
-        </div>
-        <div>
-          <form.Field
-            name="size"
-            validators={{
-              onChange: createItemSchema.shape.size,
-            }}
-          >
-            {(field) => (
-              <>
-                <Label htmlFor={field.name} className="block mb-1">
-                  Size:
-                </Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                />
-                {field.state.meta.isTouched &&
-                field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(', ')}</em>
-                ) : null}
-              </>
-            )}
-          </form.Field>
-        </div>
-        <div>
-          <form.Field
-            name="color"
-            validators={{
-              onChange: createItemSchema.shape.color,
-            }}
-          >
-            {(field) => (
-              <>
-                <Label htmlFor={field.name} className="block mb-1">
-                  Color:
-                </Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className="w-full px-3 py-2 border rounded"
-                />
-                {field.state.meta.isTouched &&
-                field.state.meta.errors.length ? (
-                  <em>{field.state.meta.errors.join(', ')}</em>
-                ) : null}
-              </>
-            )}
-          </form.Field>
-        </div>
+    <ItemForm
+      // A fresh form for each item, seeded from the loaded item.
+      key={item.id}
+      title="Edit piece"
+      defaultValues={{
+        name: item.name ?? '',
+        type: item.type ?? '',
+        size: item.size ?? '',
+        color: item.color ?? '',
+        imageUrl: item.imageUrl,
+      }}
+      currentImageUrl={item.imageUrl || undefined}
+      requirePhoto={false}
+      submitLabel="Save changes"
+      onSubmit={onSubmit}
+      footer={<DeletePiece id={item.id} name={item.name} />}
+    />
+  )
+}
 
-        {imageUrl && image && (
-          <div className="flex gap-4 items-center">
-            {image.type.startsWith('image/') ? (
-              <div className="rounded-lg overflow-hidden w-24 h-24 relative">
-                <img className="object-cover" src={imageUrl} alt={image.name} />
-              </div>
-            ) : (
-              <div className="rounded-lg overflow-hidden w-24 h-24 flex items-center justify-center bg-gray-200 text-gray-600">
-                <span>Invalid image</span>
-              </div>
-            )}
+function DeletePiece({ id, name }: { id: number; name: string | null }) {
+  const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [confirming, setConfirming] = useState(false)
 
-            <Button
-              type="button"
-              onClick={() => {
-                setImage(undefined)
-                setImageUrl(undefined)
-              }}
-              className="px-4 py-2 bg-gray-300 rounded"
-            >
-              Remove
-            </Button>
-          </div>
-        )}
+  const mutation = useMutation({
+    mutationFn: deleteItem,
+    onError: () => {
+      toast("Couldn't delete that piece. Try again?")
+    },
+    onSuccess: () => {
+      toast(`Deleted ${name}`)
 
-        <div>
-          <Label htmlFor="image" className="block mb-1">
-            Image:
-          </Label>
-          <Input
-            id="image"
-            name="image"
-            type="file"
-            accept="image/*"
-            onChange={handleImageChange}
-            className="w-full px-3 py-2 border rounded"
-          />
-        </div>
+      // Edit can be opened directly (a refresh or a pasted link), so the list
+      // and the total may not be cached yet. Update only what is cached; the
+      // closet fetches anything missing, which already leaves this item out.
+      // (Fetching the total here, as the closet's old delete button did, would
+      // read the count after the delete and then subtract one again.)
+      queryClient.setQueryData(
+        getAllItemsQueryOptions.queryKey,
+        (existingItems) =>
+          existingItems && {
+            ...existingItems,
+            items: existingItems.items.filter((item) => item.id !== id),
+          },
+      )
 
-        <form.Subscribe
-          selector={(state) => [state.canSubmit, state.isSubmitting]}
+      queryClient.setQueryData(
+        getTotalClothesQueryOptions.queryKey,
+        (currentTotal) =>
+          currentTotal && {
+            ...currentTotal,
+            total: currentTotal.total - 1,
+          },
+      )
+
+      navigate({ to: '/' })
+    },
+  })
+
+  if (!confirming) {
+    return (
+      <ChunkyButton variant="secondary" className="w-full text-danger" onClick={() => setConfirming(true)}>
+        Delete piece
+      </ChunkyButton>
+    )
+  }
+
+  return (
+    <div role="group" aria-label="Confirm delete" className="rounded-[20px] border-2 border-line bg-white p-4">
+      <p className="font-extrabold">Delete this piece? This can't be undone.</p>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <ChunkyButton
+          variant="danger"
+          disabled={mutation.isPending}
+          onClick={() => mutation.mutate({ id })}
         >
-          {([canSubmit, isSubmitting]) => (
-            <div className="flex space-x-4">
-              <Button
-                type="submit"
-                disabled={!canSubmit}
-                className="px-4 py-2 bg-blue-500 text-white rounded disabled:opacity-50"
-              >
-                {isSubmitting ? '...' : 'Submit'}
-              </Button>
-              <Button
-                type="button"
-                onClick={() => {
-                  form.reset()
-                  setImage(undefined)
-                }}
-                className="px-4 py-2 bg-gray-300 rounded"
-              >
-                Reset
-              </Button>
-            </div>
-          )}
-        </form.Subscribe>
-      </form>
+          {mutation.isPending ? 'Deleting…' : 'Delete'}
+        </ChunkyButton>
+        <ChunkyButton variant="quiet" disabled={mutation.isPending} onClick={() => setConfirming(false)}>
+          Keep it
+        </ChunkyButton>
+      </div>
+    </div>
+  )
+}
+
+function ItemFormSkeleton() {
+  const bar = 'animate-pulse rounded-full bg-line'
+  return (
+    <div aria-hidden="true" className="mx-auto max-w-md px-4 py-8">
+      <div className={`${bar} h-10 w-48`} />
+      <div className="mt-6 aspect-square w-full animate-pulse rounded-[20px] bg-line" />
+      {Array.from({ length: 4 }, (_, i) => (
+        <div key={i} className="mt-5">
+          <div className={`${bar} h-4 w-16`} />
+          <div className="mt-2 h-12 w-full animate-pulse rounded-[14px] bg-line" />
+        </div>
+      ))}
+      <div className="mt-7 h-14 w-full animate-pulse rounded-2xl bg-line" />
     </div>
   )
 }
