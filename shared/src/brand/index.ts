@@ -62,3 +62,4 @@ export function resolveFilter(filter: Filter, groups: { key: TypeKey }[]): Filte
 export function filterItems<T extends { type: string | null }>(items: T[], filter: Filter): T[] {
   return filter === 'all' ? items : items.filter((item) => typeKey(item.type) === filter)
 }
+export { GARMENT_PATHS } from './garments'
