@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": { ".": "./src/index.ts", "./brand": "./src/brand/index.ts" },
   "types": "./src/index.ts",
   "peerDependencies": { "zod": "^3.23.8" }
 }
