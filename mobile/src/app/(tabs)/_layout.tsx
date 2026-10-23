@@ -1,43 +1,61 @@
 import { Ionicons } from '@expo/vector-icons'
-import { Tabs, useRouter } from 'expo-router'
-import { Pressable, Text } from 'react-native'
+import { type BottomTabBarButtonProps } from '@react-navigation/bottom-tabs'
+import { colors } from '@stylify/shared/brand'
+import { Tabs } from 'expo-router'
+import { View } from 'react-native'
 
-// Looks like the back button of the pushed edit screen: iOS blue chevron and the destination's name.
-function BackToWardrobe() {
-  const router = useRouter()
+import { Sinkable } from '@/components/ui/Sinkable'
+
+const INACTIVE = '#b39a86'
+
+// The raised coral + in the middle of the bar: a 54 × 50 face on a 5 px coral-dark edge,
+// its top 22 px above the bar.
+function AddButton({ onPress, accessibilityState, style }: BottomTabBarButtonProps) {
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Back to Wardrobe"
-      className="flex-row items-center pl-2"
-      hitSlop={8}
-      onPress={() => router.navigate('/')}>
-      <Ionicons name="chevron-back" size={28} color="#007AFF" />
-      <Text className="-ml-1 text-[17px]" style={{ color: '#007AFF' }}>
-        Wardrobe
-      </Text>
-    </Pressable>
+    <View style={[style, { alignItems: 'center' }]}>
+      <Sinkable
+        edgeColor={colors.coralDark}
+        depth={5}
+        radius={18}
+        onPress={onPress}
+        accessibilityLabel="Add a piece"
+        accessibilityState={{ selected: accessibilityState?.selected }}
+        style={{ marginTop: -22 + 5 }}
+        faceStyle={{ width: 54, height: 50, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.coral }}>
+        <Ionicons name="add" size={32} color={colors.white} />
+      </Sinkable>
+    </View>
   )
 }
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: '#171717' }}>
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.coral,
+        tabBarInactiveTintColor: INACTIVE,
+        tabBarStyle: { backgroundColor: colors.cream, borderTopWidth: 2, borderTopColor: colors.line },
+        tabBarLabelStyle: { fontFamily: 'Nunito_800ExtraBold', fontSize: 11 },
+      }}>
       <Tabs.Screen
         name="index"
-        options={{ title: 'Wardrobe', tabBarIcon: ({ color, size }) => <Ionicons name="shirt-outline" size={size} color={color} /> }}
-      />
-      <Tabs.Screen
-        name="add"
         options={{
-          title: 'Add',
-          headerLeft: () => <BackToWardrobe />,
-          tabBarIcon: ({ color, size }) => <Ionicons name="add-circle-outline" size={size} color={color} />,
+          title: 'Closet',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'shirt' : 'shirt-outline'} size={size} color={color} />
+          ),
         }}
       />
+      <Tabs.Screen name="add" options={{ title: 'Add', tabBarButton: (props) => <AddButton {...props} /> }} />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} /> }}
+        options={{
+          title: 'Me',
+          tabBarIcon: ({ color, size, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={size} color={color} />
+          ),
+        }}
       />
     </Tabs>
   )
