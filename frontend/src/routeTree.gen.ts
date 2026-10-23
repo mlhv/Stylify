@@ -9,19 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
-import { Route as AuthenticatedOutfitSuggestionsRouteImport } from './routes/_authenticated/outfit-suggestions'
 import { Route as AuthenticatedCreateItemRouteImport } from './routes/_authenticated/create-item'
 import { Route as AuthenticatedEditItemIdRouteImport } from './routes/_authenticated/edit-item.$id'
 
-const AboutRoute = AboutRouteImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
@@ -36,12 +29,6 @@ const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedOutfitSuggestionsRoute =
-  AuthenticatedOutfitSuggestionsRouteImport.update({
-    id: '/outfit-suggestions',
-    path: '/outfit-suggestions',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedCreateItemRoute = AuthenticatedCreateItemRouteImport.update({
   id: '/create-item',
   path: '/create-item',
@@ -55,16 +42,12 @@ const AuthenticatedEditItemIdRoute = AuthenticatedEditItemIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AuthenticatedIndexRoute
-  '/about': typeof AboutRoute
   '/create-item': typeof AuthenticatedCreateItemRoute
-  '/outfit-suggestions': typeof AuthenticatedOutfitSuggestionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/edit-item/$id': typeof AuthenticatedEditItemIdRoute
 }
 export interface FileRoutesByTo {
-  '/about': typeof AboutRoute
   '/create-item': typeof AuthenticatedCreateItemRoute
-  '/outfit-suggestions': typeof AuthenticatedOutfitSuggestionsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/': typeof AuthenticatedIndexRoute
   '/edit-item/$id': typeof AuthenticatedEditItemIdRoute
@@ -72,36 +55,20 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_authenticated': typeof AuthenticatedRouteWithChildren
-  '/about': typeof AboutRoute
   '/_authenticated/create-item': typeof AuthenticatedCreateItemRoute
-  '/_authenticated/outfit-suggestions': typeof AuthenticatedOutfitSuggestionsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/': typeof AuthenticatedIndexRoute
   '/_authenticated/edit-item/$id': typeof AuthenticatedEditItemIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/about'
-    | '/create-item'
-    | '/outfit-suggestions'
-    | '/profile'
-    | '/edit-item/$id'
+  fullPaths: '/' | '/create-item' | '/profile' | '/edit-item/$id'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/about'
-    | '/create-item'
-    | '/outfit-suggestions'
-    | '/profile'
-    | '/'
-    | '/edit-item/$id'
+  to: '/create-item' | '/profile' | '/' | '/edit-item/$id'
   id:
     | '__root__'
     | '/_authenticated'
-    | '/about'
     | '/_authenticated/create-item'
-    | '/_authenticated/outfit-suggestions'
     | '/_authenticated/profile'
     | '/_authenticated/'
     | '/_authenticated/edit-item/$id'
@@ -109,18 +76,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
-  AboutRoute: typeof AboutRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/about': {
-      id: '/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof AboutRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -142,13 +101,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/outfit-suggestions': {
-      id: '/_authenticated/outfit-suggestions'
-      path: '/outfit-suggestions'
-      fullPath: '/outfit-suggestions'
-      preLoaderRoute: typeof AuthenticatedOutfitSuggestionsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/create-item': {
       id: '/_authenticated/create-item'
       path: '/create-item'
@@ -168,7 +120,6 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedCreateItemRoute: typeof AuthenticatedCreateItemRoute
-  AuthenticatedOutfitSuggestionsRoute: typeof AuthenticatedOutfitSuggestionsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedIndexRoute: typeof AuthenticatedIndexRoute
   AuthenticatedEditItemIdRoute: typeof AuthenticatedEditItemIdRoute
@@ -176,7 +127,6 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCreateItemRoute: AuthenticatedCreateItemRoute,
-  AuthenticatedOutfitSuggestionsRoute: AuthenticatedOutfitSuggestionsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedIndexRoute: AuthenticatedIndexRoute,
   AuthenticatedEditItemIdRoute: AuthenticatedEditItemIdRoute,
@@ -188,7 +138,6 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
-  AboutRoute: AboutRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

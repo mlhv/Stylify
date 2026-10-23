@@ -12,11 +12,10 @@ export function Logo({ className }: { className?: string }) {
       <span
         style={{
           color: colors.ink,
-          fontFamily: 'Nunito, ui-rounded, system-ui, sans-serif',
           fontWeight: 900,
           letterSpacing: '-0.02em',
         }}
-        className="text-2xl leading-none"
+        className="font-sans text-2xl leading-none"
       >
         Stylify
       </span>

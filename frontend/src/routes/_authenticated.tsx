@@ -1,5 +1,6 @@
 import { userQueryOptions } from '@/lib/api'
 import { createFileRoute, Outlet } from '@tanstack/react-router'
+import { AppHeader } from '@/components/app/AppHeader'
 
 const Login = () => {
   return (
@@ -16,7 +17,12 @@ const Component = () => {
     return <Login />
   }
     
-  return <Outlet />
+  return (
+    <>
+      <AppHeader />
+      <Outlet />
+    </>
+  )
 };
 
 // src/routes/_authenticated.tsx
