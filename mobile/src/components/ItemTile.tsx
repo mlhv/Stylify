@@ -42,7 +42,7 @@ export function ItemTile({ item, index }: { item: Item; index: number }) {
                 aspectRatio: 1,
                 borderRadius: 20,
                 borderBottomWidth: 5,
-                borderBottomColor: fg,
+                borderBottomColor: 'rgba(0,0,0,0.08)',
                 backgroundColor: bg,
                 overflow: 'hidden',
                 alignItems: 'center',
