@@ -18,14 +18,14 @@ const LINE = 'text-[15px]'
 
 /**
  * The classifier's line under the Type field: thinking while it runs, then what it made of the photo.
- * `prefilled` is the type this run put in the field, or null when it was not sure enough to.
+ * `guess` is the run's top guess when it was sure of it, or null when it was below the threshold.
  */
-export function ClassifierLine({ pending, hasChips, prefilled }: { pending: boolean; hasChips: boolean; prefilled: string | null }) {
+export function ClassifierLine({ pending, hasChips, guess }: { pending: boolean; hasChips: boolean; guess: string | null }) {
   if (pending) return <Thinking />
   if (!hasChips) return null
   return (
     <Txt weight="heavy" className={LINE} accessibilityLiveRegion="polite">
-      {prefilled ? `Ooh, that looks like ${prefilled}!` : 'Not sure about this one. Which is it?'}
+      {guess ? `Ooh, that looks like ${guess}!` : 'Not sure about this one. Which is it?'}
     </Txt>
   )
 }
