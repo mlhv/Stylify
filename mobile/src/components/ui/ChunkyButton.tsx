@@ -30,6 +30,7 @@ export function ChunkyButton({
   busy?: boolean
   disabled?: boolean
 }) {
+  // Busy is not pressable either, but only `disabled` dims: the spinner shows at full opacity.
   const inactive = disabled || busy
 
   if (variant === 'quiet') {
@@ -42,7 +43,7 @@ export function ChunkyButton({
         onPress={onPress}
         hitSlop={8}
         className="flex-row items-center justify-center gap-2 py-3"
-        style={({ pressed }) => ({ opacity: inactive ? 0.5 : pressed ? 0.6 : 1 })}>
+        style={({ pressed }) => ({ opacity: disabled ? 0.5 : pressed ? 0.6 : 1 })}>
         {busy ? (
           <ActivityIndicator color={colors.muted} />
         ) : (
@@ -64,6 +65,7 @@ export function ChunkyButton({
       depth={5}
       radius={16}
       disabled={inactive}
+      dimmed={disabled}
       onPress={onPress}
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy }}

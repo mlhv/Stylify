@@ -38,10 +38,12 @@ export function TypeChip({
   const reduce = useReducedMotion()
   const lift = useSharedValue(0)
   const bounced = useRef(false)
+  // Only the top guess as the chips arrive bounces; a first chip selected later by a tap does not.
+  const selectedAtMount = useRef(selected)
   const bounceStyle = useAnimatedStyle(() => ({ transform: [{ translateY: lift.get() }] }))
 
   useEffect(() => {
-    if (reduce || bounced.current || !selected || index !== 0) return
+    if (reduce || bounced.current || !selectedAtMount.current || index !== 0) return
     bounced.current = true
     lift.set(
       withDelay(
@@ -54,7 +56,7 @@ export function TypeChip({
         ),
       ),
     )
-  }, [reduce, selected, index, lift])
+  }, [reduce, index, lift])
 
   const { bg, fg } = typeColors[type]
   const delay = index * STAGGER_MS

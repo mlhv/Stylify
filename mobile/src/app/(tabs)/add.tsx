@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router'
 import { useState } from 'react'
 
 import { ItemForm, type ItemFields } from '@/components/ItemForm'
+import { Screen } from '@/components/ui/Screen'
 import { createItem, getAllItemsQueryOptions, getTotalClothesQueryOptions } from '@/lib/api'
 import { uploadUnlessDone, type UploadedPhoto } from '@/lib/reuseUpload'
 import { uploadImage } from '@/lib/upload'
@@ -34,5 +35,9 @@ export default function Add() {
     router.navigate('/')
   }
 
-  return <ItemForm key={formKey} submitLabel="Add item" onSubmit={save} />
+  return (
+    <Screen title="New piece">
+      <ItemForm key={formKey} submitLabel="Add to closet" onSubmit={save} />
+    </Screen>
+  )
 }

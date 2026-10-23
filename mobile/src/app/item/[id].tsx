@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, Text } from 'react-native'
+import { ActivityIndicator, Alert } from 'react-native'
 
 import { ErrorState, errorMessage } from '@/components/ErrorState'
 import { ItemForm, type ItemFields } from '@/components/ItemForm'
+import { ChunkyButton } from '@/components/ui/ChunkyButton'
 import {
   deleteItem,
   editItem,
@@ -100,8 +101,8 @@ export default function EditItem() {
   }
 
   function confirmDelete() {
-    Alert.alert('Delete this item?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert('Delete this piece?', "This can't be undone.", [
+      { text: 'Keep it', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => void remove() },
     ])
   }
@@ -113,9 +114,7 @@ export default function EditItem() {
       submitLabel="Save changes"
       onSubmit={save}
       footer={
-        <Pressable className="items-center rounded-lg border border-red-600 py-4" disabled={deleting} onPress={confirmDelete}>
-          {deleting ? <ActivityIndicator /> : <Text className="font-semibold text-red-600">Delete item</Text>}
-        </Pressable>
+        <ChunkyButton label="Delete piece" variant="danger" icon="trash" busy={deleting} onPress={confirmDelete} />
       }
     />
   )
