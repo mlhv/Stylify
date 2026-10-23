@@ -18,23 +18,28 @@ export function TypeChip({
 }) {
   const reduce = useReducedMotion()
   const { bg, fg } = typeColors[type]
+  const look = selected
+    ? { backgroundColor: bg, color: fg, edge: fg }
+    : { backgroundColor: colors.white, color: colors.ink, edge: colors.line }
+  const raised = `0 4px 0 0 ${look.edge}`
+  const pressed = `0 0px 0 0 ${look.edge}`
   return (
     <motion.button
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      initial={reduce ? false : { scale: 0.4, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={
-        reduce
+      initial={reduce ? false : { scale: 0.4, opacity: 0, y: 0, boxShadow: raised }}
+      animate={{ scale: 1, opacity: 1, y: 0, boxShadow: raised }}
+      // Press: sink by the 4 px edge in ~80 ms, the same as the other pressables.
+      whileTap={{ y: 4, boxShadow: pressed }}
+      transition={{
+        default: reduce
           ? { duration: 0 }
-          : { type: 'spring', stiffness: 380, damping: 14, delay: index * 0.06 }
-      }
-      style={
-        selected
-          ? { backgroundColor: bg, color: fg, boxShadow: `0 4px 0 0 ${fg}` }
-          : { backgroundColor: colors.white, color: colors.ink, boxShadow: `0 4px 0 0 ${colors.line}` }
-      }
+          : { type: 'spring', stiffness: 380, damping: 14, delay: index * 0.06 },
+        y: { duration: 0.08 },
+        boxShadow: { duration: 0.08 },
+      }}
+      style={{ backgroundColor: look.backgroundColor, color: look.color }}
       className={cn(
         'rounded-2xl px-4 py-2 text-sm font-extrabold',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-cream',

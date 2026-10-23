@@ -1,20 +1,12 @@
 import { userQueryOptions } from '@/lib/api'
 import { createFileRoute, Outlet } from '@tanstack/react-router'
 import { AppHeader } from '@/components/app/AppHeader'
-
-const Login = () => {
-  return (
-    <div>
-    You have to login.
-    <a href="/api/login">Login</a>
-    </div>
-  )
-}
+import { Landing } from '@/components/landing/Landing'
 
 const Component = () => {
   const { user } = Route.useRouteContext()
   if (!user) {
-    return <Login />
+    return <Landing />
   }
     
   return (
