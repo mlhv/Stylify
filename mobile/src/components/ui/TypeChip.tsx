@@ -16,6 +16,7 @@ import Animated, {
 import { Sinkable } from './Sinkable'
 import { Txt } from './Txt'
 
+const UNSELECTED_TEXT = '#8a6f5c'
 const STAGGER_MS = 60
 // Roughly when the spring entrance has settled, so the bounce does not fight it.
 const BOUNCE_AFTER_MS = 350
@@ -76,7 +77,7 @@ export function TypeChip({
               borderColor: selected ? fg : colors.line,
             }}>
             <View className="max-w-[200px] px-3.5 py-1.5">
-              <Txt weight="heavy" numberOfLines={1} className="text-[13px]" style={{ color: selected ? fg : colors.ink }}>
+              <Txt weight="heavy" numberOfLines={1} className="text-[13px]" style={{ color: selected ? fg : UNSELECTED_TEXT }}>
                 {label}
               </Txt>
             </View>
