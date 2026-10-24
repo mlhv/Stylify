@@ -20,7 +20,7 @@ export function TypeChip({
   const { bg, fg } = typeColors[type]
   const look = selected
     ? { backgroundColor: bg, color: fg, edge: fg }
-    : { backgroundColor: colors.white, color: colors.ink, edge: colors.line }
+    : { backgroundColor: colors.white, color: '#8a6f5c', edge: colors.line }
   const raised = `0 4px 0 0 ${look.edge}`
   const pressed = `0 0px 0 0 ${look.edge}`
   return (
@@ -39,9 +39,9 @@ export function TypeChip({
         y: { duration: 0.08 },
         boxShadow: { duration: 0.08 },
       }}
-      style={{ backgroundColor: look.backgroundColor, color: look.color }}
+      style={{ backgroundColor: look.backgroundColor, color: look.color, borderColor: look.edge }}
       className={cn(
-        'rounded-2xl px-4 py-2 text-sm font-extrabold',
+        'rounded-[14px] border-2 px-3.5 py-1.5 text-[13px] font-extrabold',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-coral focus-visible:ring-offset-2 focus-visible:ring-offset-cream',
       )}
     >

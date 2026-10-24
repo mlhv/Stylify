@@ -55,7 +55,7 @@ export function ItemForm({
 
   return (
     <div className="mx-auto max-w-md px-4 py-8">
-      <h1 className="text-4xl font-extrabold">{title}</h1>
+      <h1 className="text-4xl font-black">{title}</h1>
       <form
         noValidate
         onSubmit={(e) => {

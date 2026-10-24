@@ -1,6 +1,6 @@
 # Stylify — Virtual Wardrobe App
 
-A full-stack wardrobe management app that lets you catalog, organize, and manage your clothing items with images. Built as a personal project to explore modern TypeScript tooling end-to-end.
+A full-stack wardrobe management app that lets you catalog, organize, and manage your clothing items with images. Built as a personal project to explore modern TypeScript tooling end-to-end. It has a web app (with a landing page for signed-out visitors) and an Expo iPhone app in `mobile/`.
 
 ## Tech Stack
 
@@ -8,14 +8,16 @@ A full-stack wardrobe management app that lets you catalog, organize, and manage
 |---|---|
 | Runtime | [Bun](https://bun.sh) |
 | Backend | [Hono](https://hono.dev) |
-| Frontend | React 18 + Vite |
+| Frontend | React 19 + Vite |
+| Mobile | Expo (iPhone app in `mobile/`) |
 | Routing | TanStack Router (file-based) |
 | Server State | TanStack Query |
 | Forms | TanStack Form + Zod |
 | Database | Neon (serverless Postgres) via Drizzle ORM |
 | Auth | Kinde (OAuth 2.0 Authorization Code flow) |
 | File Storage | AWS S3 (presigned uploads) |
-| Styling | Tailwind CSS + Radix UI |
+| Styling | Tailwind CSS with the shared brand tokens (`@stylify/shared/brand`) |
+| Animation | framer-motion |
 
 ## Project Structure
 
@@ -41,7 +43,6 @@ Stylify/
 │       ├── routes/
 │       │   ├── __root.tsx           # Root layout + NavBar
 │       │   ├── _authenticated.tsx   # Auth guard layout
-│       │   ├── about.tsx
 │       │   └── _authenticated/
 │       │       ├── index.tsx        # Wardrobe grid (home)
 │       │       ├── create-item.tsx  # Create form
@@ -50,7 +51,11 @@ Stylify/
 │       ├── lib/
 │       │   └── api.ts       # Hono RPC client + all query options
 │       └── components/
-│           └── ui/          # Radix UI component wrappers
+│           ├── app/         # Closet UI: tiles, pills, chips, form, buttons
+│           ├── brand/       # Logo and garment icons
+│           ├── landing/     # Signed-out landing page
+│           └── ui/          # Toast (sonner) wrapper
+├── mobile/                  # Expo iPhone app (Expo Router)
 ├── drizzle.config.ts        # DB migration configuration
 └── docs/                    # Architecture documentation
 ```

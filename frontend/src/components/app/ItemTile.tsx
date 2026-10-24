@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from '@tanstack/react-router'
 import { motion, useReducedMotion } from 'framer-motion'
-import { TYPE_NAMES, typeColors, typeKey } from '@stylify/shared/brand'
+import { typeColors, typeKey } from '@stylify/shared/brand'
 import { Garment } from '@/components/brand/Garment'
 import type { Item } from '@/lib/api'
 
@@ -11,7 +11,7 @@ export function ItemTile({ item, index }: { item: Item; index: number }) {
   const key = typeKey(item.type)
   const { bg, fg } = typeColors[key]
   const showPhoto = !!item.imageUrl && !broken
-  const details = [TYPE_NAMES[key], item.size, item.color].filter(Boolean).join(' · ')
+  const details = [item.type, item.size, item.color].filter(Boolean).join(' · ')
 
   return (
     <motion.div

@@ -37,14 +37,14 @@ function Items() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-extrabold">
+      <h1 className="text-4xl font-black">
         Your <span className="rounded-lg bg-sun px-1.5">closet</span>
       </h1>
       <p className="mt-2 min-h-6 text-muted">
         {total ? `${total.total} ${total.total === 1 ? 'piece' : 'pieces'}, nicely sorted.` : null}
       </p>
 
-      {error ? (
+      {error && !data ? (
         <div className="mt-8">
           <ErrorPanel
             title="Couldn't load your closet"

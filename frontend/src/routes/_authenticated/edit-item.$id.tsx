@@ -95,6 +95,8 @@ function EditItem() {
           ),
         })
 
+        queryClient.setQueryData(getItemQueryOptions(itemId).queryKey, { item: updatedItem })
+
         toast(`Saved ${updatedItem.name}`)
       } catch (error) {
         queryClient.setQueryData(loadingEditItemQueryOptions.queryKey, {
@@ -176,7 +178,7 @@ function DeletePiece({ id, name }: { id: number; name: string | null }) {
       toast("Couldn't delete that piece. Try again?")
     },
     onSuccess: () => {
-      toast(`Deleted ${name}`)
+      toast(`Deleted ${name || 'that piece'}`)
 
       // Edit can be opened directly (a refresh or a pasted link), so the list
       // and the total may not be cached yet. Update only what is cached; the
