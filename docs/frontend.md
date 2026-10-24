@@ -73,7 +73,7 @@ export const Route = createFileRoute('/_authenticated')({
 })
 ```
 
-If the `/api/me` call fails (user not authenticated), the user sees the landing page instead of the route content, at whatever URL they opened. No redirect needed — the guard renders inline. The "Log in" and "Get started" links on the landing page are plain `<a href="/api/login">` and `/api/register`, because sign-in is a server redirect.
+If the `/api/me` call fails (user not authenticated), the user sees the landing page instead of the route content, at whatever URL they opened. No redirect needed — the guard renders inline. The landing page's "Sign in" (header) and "I already have an account" links go to `/api/login`, and "Get started" goes to `/api/register`; they are plain `<a>` tags because sign-in is a server redirect.
 
 ---
 
@@ -117,7 +117,7 @@ If the item was deleted (here or on the phone), `GET`/`PUT /api/wardrobe/:id` an
 
 ### Me (`_authenticated/profile.tsx`)
 
-Avatar initials, name, email and the closet counts per type (from `userQueryOptions` and `getAllItemsQueryOptions`), and a **Log out** link to `/api/logout` (backend clears cookies and redirects to Kinde).
+Avatar initials, name, email and the closet counts per type (from `userQueryOptions` and `getAllItemsQueryOptions`), and a **Sign out** link to `/api/logout` (backend clears cookies and redirects to Kinde).
 
 ### Removed
 
