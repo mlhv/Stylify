@@ -25,10 +25,13 @@ docs/       Architecture docs. Read the relevant one before changing that area.
 | `server/routes/` | `auth`, `wardrobe`, `signedUrl`, `recommendations` |
 | `server/db/schema/items.ts` | The only table |
 | `shared/src/index.ts` | `createItemSchema`, `OutfitSuggestion` |
+| `shared/src/brand/` | Colour and type-colour tokens, garment paths, `typeKey`/`groupByType`; imported as `@stylify/shared/brand` by web and mobile |
 | `frontend/src/lib/api.ts` | Typed Hono client and every `queryOptions` |
+| `frontend/src/components/app/` | The web app's primitives (`ChunkyButton`, `ItemForm`, `ItemTile`, ...); `brand/` and `landing/` sit beside it |
 | `frontend/src/routes/` | TanStack Router file routes; `_authenticated.tsx` is the auth guard |
 | `mobile/src/lib/api.ts` | Typed Hono client and `queryOptions` for the app |
 | `mobile/src/lib/authFetch.ts` | 401/503 rules, with tests |
+| `mobile/src/components/ui/` | The app's primitives (`Txt`, `Screen`, `ChunkyButton`, `Garment`, ...) |
 | `mobile/src/app/` | Expo Router routes; `_layout.tsx` is the auth guard |
 | `ml/stylify_ml/` | `prepare`, `train`, `evaluate`, `export` for the classifier, with tests in `ml/tests/` |
 | `mobile/assets/model/` | The shipped classifier: `classifier.pte` and `classifier.json` |

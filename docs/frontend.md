@@ -2,7 +2,7 @@
 
 ## Setup
 
-The frontend is a standard **React 18** + **Vite** SPA located in the `frontend/` directory. During development, Vite's dev server proxies `/api` requests to the Hono backend. In production, the frontend is built (`bun run build`) and the backend serves the static output directly.
+The frontend is a **React 19** + **Vite** SPA in `frontend/`. During development, Vite's dev server proxies `/api` requests to the Hono backend. In production, the built output is served from S3 behind CloudFront (see `docs/cloud-architecture.md`).
 
 ---
 
@@ -16,14 +16,13 @@ This project uses **file-based routing**: the folder/file structure under `src/r
 
 ```
 src/routes/
-├── __root.tsx                    → layout wrapper for entire app (NavBar, Toaster)
-├── about.tsx                     → /about  (public)
-├── _authenticated.tsx            → auth guard layout (no URL segment)
+├── __root.tsx                    → layout wrapper for entire app (Toaster)
+├── _authenticated.tsx            → auth guard layout (no URL segment); signed out shows the landing page
 └── _authenticated/
-    ├── index.tsx                 → /  (home, wardrobe grid)
+    ├── index.tsx                 → /  (closet grid)
     ├── create-item.tsx           → /create-item
     ├── edit-item.$id.tsx         → /edit-item/:id  ($id = dynamic segment)
-    └── profile.tsx               → /profile
+    └── profile.tsx               → /profile  (shown as "Me")
 ```
 
 **Naming conventions:**
@@ -68,43 +67,43 @@ export const Route = createFileRoute('/_authenticated')({
   },
   component: function AuthGuard() {
     const { user } = Route.useRouteContext()
-    if (!user) return <Login />   // shows "Login" button linking to /api/login
-    return <Outlet />             // renders the matched child route
+    if (!user) return <Landing />                 // signed out: the landing page
+    return <><AppHeader /><Outlet /></>           // signed in: header, then the matched child route
   },
 })
 ```
 
-If the `/api/me` call fails (user not authenticated), the user sees the login screen instead of the route content. No redirect needed — the guard renders inline.
+If the `/api/me` call fails (user not authenticated), the user sees the landing page instead of the route content, at whatever URL they opened. No redirect needed — the guard renders inline. The "Log in" and "Get started" links on the landing page are plain `<a href="/api/login">` and `/api/register`, because sign-in is a server redirect.
 
 ---
 
 ## Root Layout — `__root.tsx`
 
-Renders the **NavBar** and wraps everything in the `<Outlet />` for child routes. Also renders the `<Toaster />` for toast notifications (from Sonner).
-
-**NavBar** is responsive:
-- **Desktop**: horizontal links (Home, About, Create, Profile)
-- **Mobile**: hamburger menu icon that opens a **Sheet** (Radix UI slide-in drawer) with the same links
+Renders the `<Outlet />` and the `<Toaster />` (Sonner). The header is not here: `_authenticated.tsx` renders `AppHeader` only for signed-in users, so the landing page has its own.
 
 ---
 
+## Look and feel
+
+Warm cream background, ink text, coral accent, rounded "chunky" buttons with a hard bottom edge, Nunito (`@fontsource/nunito`, weights 700 to 900). The colours and the ten type colours (`top`, `outerwear`, `trousers`, `shorts`, `skirt`, `dress`, `shoes`, `hat`, `bag`, `other`) live in `shared/src/brand/tokens.json`, read by `frontend/tailwind.config.js` and `mobile/tailwind.config.js`, so both apps use the same values. `shared/src/brand/index.ts` (imported as `@stylify/shared/brand`) also holds the type helpers: `typeKey` maps a free-text `type` ("jeans", "Hoodie") to one of the keys, `groupByType` counts items per key, and `resolveFilter` falls back to "all" when the selected filter has no items. `garments.ts` has the silhouette paths for the ten types and the hanger.
+
 ## Pages & Components
 
-### Home (`_authenticated/index.tsx`)
+### Landing (`components/landing/`)
 
-The wardrobe grid. Displays all clothing items in a responsive card grid (1 column on mobile → 4 columns on XL screens).
+Shown at any URL when signed out. `Landing.tsx` is the hero, three feature cards and the footer; `Walkthrough.tsx` is a looping four-scene animation (take a photo, thinking, the guess, it lands in the closet) built from the real `TypeChip` and `ChunkyButton`. It advances every 2.5 s, pauses while the tab is hidden, and drops the bounce and scale effects (opacity changes stay) when the visitor prefers reduced motion. There is no demo wardrobe: the walkthrough stands in for one.
 
-Key behaviors:
-- Fetches items via `getAllItemsQueryOptions` and total count via `getTotalClothesQueryOptions`
-- While a **create** mutation is in progress, a loading skeleton card appears at the top of the grid (via `loadingCreateItemQueryOptions`)
-- Each card shows: image, name, color/type/size badges
-- Edit button → navigates to `/edit-item/:id`
-- Delete button → calls `deleteItem()` mutation, updates cache immediately (optimistic update)
-- Item cards animate in/out with **Framer Motion**
+### Header (`components/app/AppHeader.tsx`)
 
-### Create Item (`_authenticated/create-item.tsx`)
+Logo, Closet, a coral Add button and Me. The same row on phones and desktop; there is no hamburger menu or drawer.
 
-A form with fields: Name, Type, Size, Color, Image.
+### Closet (`_authenticated/index.tsx`)
+
+The grid of `ItemTile`s, with a row of `Pill` filters ("All" and one per type that has items). Tiles are tinted by type and show a `Garment` silhouette when an item has no photo. Items come from `getAllItemsQueryOptions`. While a create mutation is running, a skeleton tile (`ItemTileSkeleton`) appears first (`loadingCreateItemQueryOptions`). With no items it shows `EmptyCloset`; a failed load shows `ErrorPanel`. Tiles animate in with Framer Motion.
+
+### Add and Edit (`create-item.tsx`, `edit-item.$id.tsx`)
+
+Both use `components/app/ItemForm.tsx`: `Field`s for name, size and colour, `TypeChip`s for the type, and `PhotoPicker`. Edit adds a delete button.
 
 Image upload flow:
 1. User selects a file → browser preview shown via `URL.createObjectURL(file)`
@@ -112,36 +111,23 @@ Image upload flow:
 3. PUT the file directly to S3 using the signed URL
 4. Use the resulting S3 URL as `imageUrl` in the POST to `/api/wardrobe`
 
-After success: prepends the new item to the cached items list and increments the total count, so the home page updates without a refetch.
+After a create the new item is prepended to the cached list and the total count incremented; after an edit the item is replaced in the cached list. If no new image was chosen on edit, the existing `imageUrl` is kept.
 
-### Edit Item (`_authenticated/edit-item.$id.tsx`)
+If the item was deleted (here or on the phone), `GET`/`PUT /api/wardrobe/:id` answer 404 and `getItem`/`editItem` throw `ItemNotFoundError`. The page then shows "This item no longer exists" with a button back to the closet, and the items list and count are refetched. A 404 is not retried (`retryUnlessNotFound`); any other load failure shows "Could not load this item" with "Try again". `frontend/src/lib/api.test.ts` covers the client side (`bun test ./frontend`).
 
-Same form as create, pre-populated with the existing item's data. Fetches the item via `getItemQueryOptions(id)`. On submit, if no new image was chosen, the existing `imageUrl` is preserved.
+### Me (`_authenticated/profile.tsx`)
 
-After success: replaces the item in the cached items list.
+Avatar initials, name, email and the closet counts per type (from `userQueryOptions` and `getAllItemsQueryOptions`), and a **Log out** link to `/api/logout` (backend clears cookies and redirects to Kinde).
 
-If the item was deleted (here or on the phone), `GET`/`PUT /api/wardrobe/:id` answer 404 and `getItem`/`editItem` throw `ItemNotFoundError`. The page then shows "This item no longer exists" with a button back to the wardrobe, and the items list and count are refetched. A 404 is not retried (`retryUnlessNotFound`); any other load failure shows "Could not load this item" with "Try again". `frontend/src/lib/api.test.ts` covers the client side (`bun test ./frontend`).
+### Removed
 
-### Profile (`_authenticated/profile.tsx`)
-
-Shows the current user's avatar (initials), name, and email from `userQueryOptions`. Has a **Logout** button that navigates to `/api/logout` (backend clears cookies and redirects to Kinde).
+The About page and the Outfit Suggestions page are gone, and `/about` and `/outfit-suggestions` no longer exist. `GET /api/recommendations` is kept on the server for a later screen.
 
 ---
 
-## UI Components (`src/components/ui/`)
+## Components
 
-All UI components are thin wrappers around **Radix UI** primitives styled with **Tailwind CSS**. This is the [shadcn/ui](https://ui.shadcn.com) pattern.
-
-| Component | Based On | Used For |
-|---|---|---|
-| `Button` | Radix Slot + CVA | All buttons (variants: default, destructive, outline, ghost, link) |
-| `Card` | `div` | Item cards on the home page |
-| `Input` | `input` | Form text inputs |
-| `Label` | Radix Label | Form field labels |
-| `Badge` | `div` + CVA | Color/type/size tags on item cards |
-| `Skeleton` | `div` | Loading placeholder shapes |
-| `Avatar` | Radix Avatar | Profile picture / initials display |
-| `Sheet` | Radix Dialog | Mobile navigation drawer |
-| `Sonner` | Sonner | Toast notification container |
-
-**CVA** (Class Variance Authority) is used for components with multiple style variants (Button, Badge) — it generates the correct Tailwind class string based on the `variant` prop.
+- `components/app/`: the app's own primitives: `AppHeader`, `ChunkyButton` (and `chunkyClasses` for links styled as buttons), `Pill`, `TypeChip`, `Field`, `ItemForm`, `ItemTile`, `PhotoPicker`, `EmptyCloset`, `ErrorPanel`.
+- `components/brand/`: `Logo` (coral hanger plus the word) and `Garment` (SVG silhouette by type, `fill="currentColor"`).
+- `components/landing/`: `Landing`, `Walkthrough`.
+- `components/ui/sonner.tsx`: the toast container, the only shadcn component left. Radix, CVA and the other shadcn wrappers were removed with the restyle.

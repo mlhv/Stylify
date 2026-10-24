@@ -81,6 +81,15 @@ The mapping matches the SDK's error text and is pinned by `refreshOutcome.test.t
 - The item form (`src/components/ItemForm.tsx`) handles the keyboard itself: while it is up, a spacer as tall as the part of the scroll view it covers is added, so the submit button and "Delete item" can be scrolled above it, the focused field is kept in view, and scrolling never closes the keyboard. React Native's `automaticallyAdjustKeyboardInsets` was not enough on the phone.
 - Photos: picked with `expo-image-picker` (camera or library), re-encoded to JPEG with `expo-image-manipulator` (resized to a maximum width of 1600, quality 0.8; `src/lib/upload.ts`), then uploaded straight to S3 with a `PUT` using `fetch` from `expo/fetch` and a `File` body, at the presigned URL from `GET /api/signed-url`. SDK 55's `expo-file-system` has no `File.upload`. If a save fails after the upload, a retry reuses the uploaded photo (`src/lib/reuseUpload.ts`).
 
+### Look and feel
+
+- Warm cream theme, coral accent, chunky buttons. Colours and the ten type colours come from `shared/src/brand/tokens.json` through `mobile/tailwind.config.js` (the same file the web app uses). `shared/src/brand/` also has the type helpers (`typeKey`, `groupByType`, `resolveFilter`).
+- Font: Nunito 700, 800 and 900 from `@expo-google-fonts/nunito`, loaded with `useFonts` in `src/app/_layout.tsx`. The layout holds the splash screen until the fonts are loaded (or failed), so no text is drawn in the system font. Text goes through `Txt`.
+- Primitives are in `src/components/ui/`: `Txt`, `Screen` (title, subtitle, scroll), `ChunkyButton`, `Pill`, `TypeChip`, `Sinkable` (press-down animation) and `Garment`. `ItemTile`, `ItemForm`, `EmptyCloset`, `ErrorState` and `ClassifierLine` are in `src/components/`.
+- `Garment` draws the silhouettes from the PNGs in `assets/illustrations/` (ten types plus `hanger`; white on transparent, 384 x 384) and tints them. The PNGs were rendered once from the SVG paths in `shared/src/brand/garments.ts`: each path set was set as an inline `<svg>` in headless Chromium (Playwright) with a transparent background and screenshotted at 384 x 384. If the paths change, render them again; there is no script in the repo.
+- `app.json` sets `userInterfaceStyle` to `light` and a cream splash background. Both take effect after the next `bunx expo prebuild -p ios --clean`, which also loses the signing setting (see "On an iPhone").
+- The Kinde hosted sign-in page is not styled by the app. Its branding (business name, logo, coral) is set by hand in Kinde's dashboard.
+
 ### Missing items and `unmaskNotFound`
 
 Until 2026-10-13 the CloudFront distribution turned any origin 404 into `200 text/html`, so a missing item arrived as a "successful" page. That was fixed in the distribution (see `docs/cloud-architecture.md`, "SPA Routing Configuration"): a missing item now answers 404. `src/lib/unmaskNotFound.ts` still wraps the API client's fetch and turns a 2xx answer whose content type is not JSON back into a 404; it is a guard against the masking coming back and does nothing while API 404s arrive as 404.

@@ -286,7 +286,7 @@ Each gets its own spec, plan and build. The order can change; the classifier's t
    - In the app: take a photo, the model pre-fills the type, the user confirms or corrects it. The model never adds an item silently.
    - Open questions: where the training code lives (a `ml/` directory here or a separate repo), how the model file is shipped (bundled or downloaded), and whether corrections are logged for retraining.
 
-2. **Web landing page and read-only demo.**
+2. **Web landing page and read-only demo.** Landing page done (2026-10-24, `2026-10-23-frontend-polish-design.md`): an animated walkthrough replaced the demo wardrobe, and the logged-in web screens were restyled too. The read-only demo was not built.
    - Logged-out visitors to stylify.space see a landing page: what the app is, screenshots, the tech stack, an App Store link, and a sign-in button.
    - "Try the demo" opens a sample wardrobe with no login, served from seeded demo data, read-only.
    - The logged-in web screens are not restyled.
@@ -296,6 +296,13 @@ Each gets its own spec, plan and build. The order can change; the classifier's t
    - Outfit suggestions: the backend route exists (`GET /api/recommendations`, Gemini plus Open-Meteo weather); the web page for it is a stub. Build the mobile screen using device location.
    - Wear tracking: `lastWornAt` and `POST /api/wardrobe/:id/worn` exist with no UI. Add "wore this today" and show last-worn on items.
    - Search, filter and sort on the wardrobe grid.
+
+Future work after the frontend polish:
+
+- An About page.
+- An Outfit Suggestions screen. `GET /api/recommendations` is kept; it needs `GEMINI_API_KEY` on Lambda to return anything.
+- Haptics with `expo-haptics`.
+- Kinde hosted sign-in branding: manual, in Kinde's dashboard (business name, logo, coral).
 
 Later, not yet planned: Android, a CI workflow for mobile builds, making the web app installable as a PWA.
 
