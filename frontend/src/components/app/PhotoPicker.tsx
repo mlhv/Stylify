@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { Camera } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { isHeicFile, prepareImage } from '@/lib/photo'
 import { ChunkyButton } from './ChunkyButton'
 
 // A square photo tile: click or drop an image on it. Shows `previewUrl` until a
@@ -16,6 +17,10 @@ export function PhotoPicker({
   const [chosenUrl, setChosenUrl] = useState<string | undefined>(undefined)
   const [dragging, setDragging] = useState(false)
   const [broken, setBroken] = useState(false)
+  const [preparing, setPreparing] = useState(false)
+  const [failed, setFailed] = useState(false)
+  // Only the latest pick may land, if an earlier one is still converting.
+  const pickId = useRef(0)
 
   const shownUrl = chosenUrl ?? previewUrl
 
@@ -29,10 +34,21 @@ export function PhotoPicker({
     setBroken(false)
   }, [shownUrl])
 
-  const choose = (file: File | undefined) => {
-    if (!file || !file.type.startsWith('image/')) return
-    setChosenUrl(URL.createObjectURL(file))
-    onChange(file)
+  const choose = async (picked: File | undefined) => {
+    if (!picked) return
+    const id = ++pickId.current
+    setFailed(false)
+    setPreparing(isHeicFile(picked))
+    try {
+      const file = await prepareImage(picked)
+      if (id !== pickId.current || !file) return
+      setChosenUrl(URL.createObjectURL(file))
+      onChange(file)
+    } catch {
+      if (id === pickId.current) setFailed(true)
+    } finally {
+      if (id === pickId.current) setPreparing(false)
+    }
   }
 
   const open = () => inputRef.current?.click()
@@ -40,7 +56,7 @@ export function PhotoPicker({
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     setDragging(false)
-    choose(e.dataTransfer.files?.[0])
+    void choose(e.dataTransfer.files?.[0])
   }
 
   const dragProps = {
@@ -52,7 +68,7 @@ export function PhotoPicker({
     onDrop,
   }
 
-  const hasPhoto = !!shownUrl && !broken
+  const hasPhoto = !!shownUrl && !broken && !preparing
 
   return (
     <div
@@ -66,10 +82,10 @@ export function PhotoPicker({
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,.heic,.heif"
         className="hidden"
         onChange={(e) => {
-          choose(e.target.files?.[0])
+          void choose(e.target.files?.[0])
           // Let the same file be picked again after a change.
           e.target.value = ''
         }}
@@ -98,8 +114,14 @@ export function PhotoPicker({
             'hover:text-coral focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-coral',
           )}
         >
-          <Camera className="h-12 w-12" strokeWidth={2.5} aria-hidden />
-          <span className="text-base font-extrabold">Add a photo — click or drop it here</span>
+          <Camera className={cn('h-12 w-12', preparing && 'animate-pulse')} strokeWidth={2.5} aria-hidden />
+          <span className="text-base font-extrabold" aria-live="polite">
+            {preparing
+              ? 'Getting your photo ready…'
+              : failed
+                ? "Couldn't read that photo. Try another?"
+                : 'Add a photo — click or drop it here'}
+          </span>
         </button>
       )}
     </div>

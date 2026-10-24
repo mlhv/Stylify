@@ -19,6 +19,7 @@
     "@tanstack/zod-form-adapter": "^0.32.0",
     "clsx": "^2.1.1",
     "framer-motion": "^11.11.10",
+    "heic-to": "1.6.5",
     "hono": "^4.6.9",
     "lucide-react": "^0.439.0",
     "react": "19.2.0",
