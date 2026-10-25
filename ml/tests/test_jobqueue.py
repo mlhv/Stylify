@@ -36,6 +36,7 @@ class FakeRunner:
             self.time += timedelta(minutes=self.minutes)
             run.mkdir(parents=True)
             (run / "best.pt").write_bytes(b"x")
+            (run / "trained.json").write_text("{}")
         else:
             (run / "metrics.json").write_text("{}")
         return 0
@@ -59,9 +60,10 @@ def test_skips_finished_runs(tmp_path):
     assert runner.calls == []
 
 
-def test_evaluates_run_with_checkpoint_only(tmp_path):
+def test_evaluates_trained_run_without_metrics(tmp_path):
     (tmp_path / "runs" / "a").mkdir(parents=True)
     (tmp_path / "runs" / "a" / "best.pt").write_bytes(b"x")
+    (tmp_path / "runs" / "a" / "trained.json").write_text("{}")
     runner = FakeRunner(tmp_path)
     assert run_queue(tmp_path, _jobs("a"), runner=runner, now=runner.now) == ["a"]
     assert runner.calls == [("evaluate", "a")]
@@ -102,3 +104,41 @@ def test_job_files_are_valid(path):
 
 def test_sweep_files_exist():
     assert {p.name for p in SWEEPS.glob("*.json")} >= {"first.json", "sweep.json"}
+
+
+def test_checkpoint_without_trained_marker_is_retrained(tmp_path):
+    # interrupted mid-training: best.pt from an early epoch, but train never finished
+    (tmp_path / "runs" / "a").mkdir(parents=True)
+    (tmp_path / "runs" / "a" / "best.pt").write_bytes(b"early")
+    runner = FakeRunner(tmp_path)
+    assert run_queue(tmp_path, _jobs("a"), runner=runner, now=runner.now) == ["a"]
+    assert runner.calls == [("train", "a"), ("evaluate", "a")]
+    assert len(list((tmp_path / "runs" / "_failed").iterdir())) == 1
+
+
+def test_train_that_fails_after_a_checkpoint_is_retrained_next_time(tmp_path):
+    class Crashes(FakeRunner):
+        def __call__(self, cmd, log):
+            if "train" in cmd[cmd.index("-m") + 1] and not self.calls:
+                self.calls.append(("train", "a"))
+                (self.data / "runs" / "a").mkdir(parents=True)
+                (self.data / "runs" / "a" / "best.pt").write_bytes(b"early")
+                return 1
+            return super().__call__(cmd, log)
+
+    runner = Crashes(tmp_path)
+    assert run_queue(tmp_path, _jobs("a"), runner=runner, now=runner.now) == []
+    assert run_queue(tmp_path, _jobs("a"), runner=runner, now=runner.now) == ["a"]
+    assert runner.calls[1:] == [("train", "a"), ("evaluate", "a")]
+
+
+def test_second_queue_refuses_to_start(tmp_path):
+    import fcntl
+
+    (tmp_path / "logs").mkdir()
+    with (tmp_path / "logs" / "queue.lock").open("w") as held:
+        fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        runner = FakeRunner(tmp_path)
+        with pytest.raises(SystemExit, match="already running"):
+            run_queue(tmp_path, _jobs("a"), runner=runner, now=runner.now)
+        assert runner.calls == []

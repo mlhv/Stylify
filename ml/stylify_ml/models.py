@@ -1,6 +1,7 @@
 """Candidate classifier backbones, head selection and checkpoints."""
 
 from collections.abc import Iterable
+import os
 from pathlib import Path
 
 import timm
@@ -38,7 +39,10 @@ def head_parameters(model: torch.nn.Module, name: str) -> Iterable[torch.nn.Para
 
 
 def save_checkpoint(path: Path, model: torch.nn.Module, name: str, extra: dict) -> None:
-    torch.save({"model": name, "labels": list(LABELS), "state_dict": model.state_dict(), **extra}, path)
+    """Written to a temp file and renamed, so an interrupted save never leaves a truncated checkpoint."""
+    tmp = Path(path).with_name(Path(path).name + ".tmp")
+    torch.save({"model": name, "labels": list(LABELS), "state_dict": model.state_dict(), **extra}, tmp)
+    os.replace(tmp, path)
 
 
 def load_checkpoint(path: Path) -> tuple[torch.nn.Module, dict]:

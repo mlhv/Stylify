@@ -38,7 +38,10 @@ EOF
 
 echo "== Data from $MAC"
 mkdir -p "$DATA/runs/$BASELINE"
-rsync -a --info=progress2 "$MAC:stylify-data/crops" "$MAC:stylify-data/manifest.csv" "$MAC:stylify-data/personal" "$DATA/"
+# One source per call: the Mac's rsync (openrsync) is the server, and single sources are the safest with it.
+rsync -a --info=progress2 "$MAC:stylify-data/manifest.csv" "$DATA/"
+rsync -a --info=progress2 "$MAC:stylify-data/crops" "$DATA/"
+rsync -a --info=progress2 "$MAC:stylify-data/personal" "$DATA/"
 rsync -a "$MAC:stylify-data/runs/$BASELINE/metrics.json" "$DATA/runs/$BASELINE/"
 
 echo "== Counts (compare with the Mac)"

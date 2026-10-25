@@ -132,6 +132,8 @@ def _accessory_recalls(metrics: dict) -> list[float | None]:
 
 
 def _verdict(metrics: dict, size: int | None, baseline: dict) -> str:
+    if any(_top1(baseline, k) is not None and _top1(metrics, k) is None for k in ("users", "carousell")):
+        return "unscored"  # evaluated before the baseline's test sets existed: re-evaluate it to compare
     if size is not None and size > MAX_PTE_BYTES:
         return "too-big"
     for mine, base in zip(_accessory_recalls(metrics), _accessory_recalls(baseline)):
@@ -141,7 +143,7 @@ def _verdict(metrics: dict, size: int | None, baseline: dict) -> str:
 
 
 def compare(data: Path, baseline: str | None = None) -> str:
-    """A table of every evaluated run. With a baseline run id, mark each run ok / acc-drop / too-big and name
+    """A table of every evaluated run. With a baseline run id, mark each run ok / unscored / acc-drop / too-big and name
     the winner: the best mean of users and Carousell top-1 among ok runs, tie-break val balanced accuracy."""
     header = ("run", "model", "val bacc", "users top1", "carousell top1", "mean top1", "users top3",
               "personal top1", "room top1", "shoes/hat/bag", "threshold", ".pte MB")

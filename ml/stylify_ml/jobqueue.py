@@ -1,14 +1,16 @@
 """Run a list of training jobs one after another, each followed by its evaluation. Safe to stop and restart.
 
 A job is {"run_id": ..., "args": [...]}, where args go to `stylify_ml.train` after --data and --run-id.
-On a restart, finished runs (metrics.json) are skipped, trained-but-unevaluated runs (best.pt) are only
-evaluated, and half-written runs are moved to runs/_failed/ and trained again. With --stop-at, a job is not
+On a restart, finished runs (metrics.json) are skipped, trained-but-unevaluated runs (trained.json, which
+train writes last) are only evaluated, and any other run directory, including one with an early best.pt, is
+moved to runs/_failed/ and trained again. Only one queue may run at a time (a lock in logs/). With --stop-at, a job is not
 started if the longest job so far would not finish by then.
 """
 
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import shutil
 import subprocess
@@ -39,6 +41,20 @@ def run_queue(data: Path, jobs: list[dict], stop_at: datetime | None = None,
     """Run the jobs in order; return the run ids finished in this call."""
     data = Path(data)
     (data / "logs").mkdir(parents=True, exist_ok=True)
+    lock = (data / "logs" / "queue.lock").open("w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock.close()
+        sys.exit("another queue is already running on this data (logs/queue.lock); stop it first")
+    try:
+        return _run_jobs(data, jobs, stop_at, runner, now)
+    finally:
+        lock.close()
+
+
+def _run_jobs(data: Path, jobs: list[dict], stop_at: datetime | None,
+              runner: Callable[[list[str], Path], int], now: Callable[[], datetime]) -> list[str]:
     finished: list[str] = []
     longest: timedelta | None = None
     for job in jobs:
@@ -52,7 +68,7 @@ def run_queue(data: Path, jobs: list[dict], stop_at: datetime | None = None,
             print(f"{run_id}: skipped, would not finish by {stop_at:%H:%M}", flush=True)
             continue
         started = now()
-        if run.exists() and not (run / "best.pt").exists():
+        if run.exists() and not (run / "trained.json").exists():
             aside = data / "runs" / "_failed" / f"{run_id}-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}"
             aside.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(run, aside)

@@ -18,7 +18,7 @@ You do not export models, change the app, or pick the winner: the Mac session do
 - **Never commit, upload or print data**: nothing under `~/stylify-data/` goes into git or anywhere online. The datasets' licences forbid it, and `personal/` holds Minh's own photos.
 - Work only on branch `ml/room-retrain`. Never push `main`.
 - Keep the data on WSL's own disk (`~/stylify-data`), not under `/mnt/c`: it is far faster.
-- The training queue is safe to stop (Ctrl-C) and start again with the same command: finished runs are skipped, a run that was trained but not evaluated is just evaluated, and a half-written run is moved to `runs/_failed/` and trained again.
+- The training queue is safe to stop (Ctrl-C) and start again with the same command: finished runs are skipped, a run that finished training but not evaluation is just evaluated, and an interrupted run is moved to `runs/_failed/` and trained again from the start (the time it had is lost). Only one queue can run at a time; a second one exits with "already running". Never start a second queue because you think the first died: check `ps aux | grep stylify_ml` first.
 
 ## Before you start: what Minh does
 
@@ -39,9 +39,9 @@ cd ml
 scripts/pc_setup.sh <mac-user>@<mac-host>
 ```
 
-`pc_setup.sh` must end with a line like `torch 2.14.1, CUDA 12.x, NVIDIA GeForce RTX 5070, compute capability 12.0: OK` and print counts. The Mac had **127,126** manifest rows and the same number of crop files when this was written; tell Minh if they differ.
+`pc_setup.sh` must end with a line like `torch 2.14.1, CUDA 13.x, NVIDIA GeForce RTX 5070, compute capability 12.0: OK` and print counts (the locked torch wheel is built for CUDA 13; that is expected). The Mac had **127,126** manifest rows and the same number of crop files when this was written; tell Minh if they differ.
 
-If the CUDA check fails: check `nvidia-smi` works in WSL (if not, the Windows driver needs updating; WSL needs no Linux driver). If PyTorch says the GPU's compute capability is not supported, stop and report it with the exact message; do not change the pinned torch version without asking.
+If the CUDA check fails: check `nvidia-smi` works in WSL (if not, the Windows driver needs updating; WSL needs no Linux driver). The CUDA 13 wheel needs a Windows NVIDIA driver **580 or newer**: if `nvidia-smi` works but shows an older driver, `torch.cuda.is_available()` is False; ask Minh to update the driver in the NVIDIA app on Windows, then run `wsl --shutdown` from Windows and start again. If PyTorch says the GPU's compute capability is not supported, stop and report it with the exact message; do not change the pinned torch version without asking.
 
 ```bash
 # 3. The first run (also measures how long one run takes)
@@ -71,5 +71,7 @@ git add docs/superpowers/handoffs/2026-10-25-pc-training-results.md ml/sweeps
 git commit -m "docs: PC training results"
 git push origin ml/room-retrain
 ```
+
+A fresh WSL may have no git identity or GitHub login: set `git config user.name "Minh Le"` and `git config user.email` to the address Minh gives you, and use `gh auth login` (or ask Minh for a token) to push. If pushing is not possible, copy the file to the Mac instead: `rsync -a docs/superpowers/handoffs/2026-10-25-pc-training-results.md <mac-user>@<mac-host>:Stylify/docs/superpowers/handoffs/`.
 
 Tell Minh it is done. If a run is still training at 21:30, leave it running and say so: the Mac picks from whatever has arrived.

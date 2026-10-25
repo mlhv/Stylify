@@ -51,7 +51,7 @@ def tiny_run(tmp_path_factory):
 @needs_executorch
 def test_train_then_evaluate_then_compare(tiny_run):
     data, run = tiny_run
-    assert {"config.json", "epochs.jsonl", "best.pt"} <= {p.name for p in run.iterdir()}
+    assert {"config.json", "epochs.jsonl", "best.pt", "trained.json"} <= {p.name for p in run.iterdir()}
     epochs = [json.loads(line) for line in (run / "epochs.jsonl").read_text().splitlines()]
     assert len(epochs) == 2
     assert [(e["phase"], e["epoch"]) for e in epochs] == [("head", 1), ("full", 1)]
@@ -374,3 +374,20 @@ def test_export_int8_writes_when_close(tiny_run, tmp_path, monkeypatch):
     export.main(["--run", str(run), "--out", str(out), "--int8", "--calibration-size", "9"])
     meta = json.loads((out / "classifier.json").read_text())
     assert meta["quantized"] == "int8" and (out / "classifier.pte").stat().st_size > 0
+
+
+def test_compare_winner_needs_the_baselines_scores(tmp_path):
+    # an old run scored on users only must not beat runs scored on users and Carousell
+    _write_run(tmp_path, "base", users=0.89, carousell=0.79, recalls={})
+    _write_run(tmp_path, "old-users-only", users=0.95, carousell=None, recalls={})
+    _write_run(tmp_path, "new", users=0.89, carousell=0.84, recalls={})
+    table = compare(tmp_path, baseline="base")
+    assert [l for l in table.splitlines() if l.startswith("old-users-only")][0].split()[-1] == "unscored"
+    assert table.splitlines()[-1] == "winner: new"
+
+
+@needs_executorch
+def test_balanced_sample_covers_every_label(tiny_run):
+    data, _ = tiny_run
+    picked = export._balanced_rows(data, "val", 9)
+    assert sorted(r.label for r in picked) == sorted(LABELS)

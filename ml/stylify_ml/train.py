@@ -127,6 +127,9 @@ def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e
                     best = val_bacc
                     save_checkpoint(run / "best.pt", model, model_name,
                                     {"val_balanced_accuracy": val_bacc, "phase": phase, "epoch": epoch})
+    # Written last: best.pt exists after the first epoch, so only this file says training finished.
+    (run / "trained.json").write_text(json.dumps({"finished_at": datetime.now(timezone.utc).isoformat(),
+                                                  "best_val_balanced_accuracy": best}) + "\n")
     return run
 
 

@@ -180,21 +180,25 @@ def _run_data(run: Path, data: Path | None) -> Path:
     return recorded if (recorded / "manifest.csv").exists() else run.parent.parent
 
 
-def _calibration(data: Path, size: int) -> torch.Tensor:
-    """`size` train crops, labels taken in turn after a seeded shuffle, so every label is represented."""
-    rows = ManifestDataset(data, "train", eval_transform())
-    by_label: dict[str, list[int]] = {}
-    for i, r in enumerate(rows.rows):
-        by_label.setdefault(r.label, []).append(i)
+def _balanced_rows(data: Path, split: str, size: int) -> list:
+    """`size` rows of `split`, labels taken in turn after a seeded shuffle, so every label is represented."""
+    by_label: dict[str, list] = {}
+    for r in ManifestDataset(data, split, eval_transform()).rows:
+        by_label.setdefault(r.label, []).append(r)
     rng = random.Random(0)
-    for indices in by_label.values():
-        rng.shuffle(indices)
-    picked, queues = [], [by_label[l] for l in sorted(by_label)]
+    for rows in by_label.values():
+        rng.shuffle(rows)
+    picked, queues = [], [by_label[label] for label in sorted(by_label)]
     while len(picked) < size and any(queues):
         for q in queues:
             if q and len(picked) < size:
                 picked.append(q.pop())
-    return torch.stack([rows[i][0] for i in picked])
+    return picked
+
+
+def _tensors(data: Path, rows: list) -> torch.Tensor:
+    transform = eval_transform()
+    return torch.stack([transform(load_image(Path(data) / r.path)) for r in rows])
 
 
 def _int8_or_exit(model: torch.nn.Module, data: Path, inputs: torch.Tensor, calibration_size: int,
@@ -203,10 +207,11 @@ def _int8_or_exit(model: torch.nn.Module, data: Path, inputs: torch.Tensor, cali
     top-1 is within INT8_MAX_TOP1_DROP of float's; otherwise print the numbers and exit non-zero."""
     float_pte, int8_pte = work / "float.pte", work / "int8.pte"
     print(f"float .pte {export_pte(model, float_pte) / 1e6:.1f} MB", flush=True)
-    calibration = _calibration(data, calibration_size)
+    calibration = _tensors(data, _balanced_rows(data, "train", calibration_size))
     print(f"int8 .pte {export_pte(model, int8_pte, quantize=True, calibration=calibration) / 1e6:.1f} MB", flush=True)
-    agreement = check_top1_agreement(int8_pte, model, inputs, INT8_MIN_AGREEMENT)
-    print(f"int8 top-1 agrees with PyTorch on {agreement:.2f} of {len(inputs)} val crops", flush=True)
+    agreement_inputs = _tensors(data, _balanced_rows(data, "val", 90))  # every label, shoes/hat/bag included
+    agreement = check_top1_agreement(int8_pte, model, agreement_inputs, INT8_MIN_AGREEMENT)
+    print(f"int8 top-1 agrees with PyTorch on {agreement:.2f} of {len(agreement_inputs)} val crops", flush=True)
     ok = True
     for half in ("users", "carousell"):
         f, q = score_pte(float_pte, data, half), score_pte(int8_pte, data, half)
@@ -231,7 +236,7 @@ def _export_run(run: Path, out_dir: Path, data: Path | None = None, int8: bool =
     val = ManifestDataset(data, "val", eval_transform())
     if not len(val):
         raise ValueError(f"no val rows in {data / 'manifest.csv'} for the parity check")
-    inputs = torch.stack([val[i][0] for i in range(min(64 if int8 else 16, len(val)))])
+    inputs = torch.stack([val[i][0] for i in range(min(16, len(val)))])
     personal = metrics["personal"]
     users = metrics.get("users")  # absent in runs evaluated before the clothing dataset
     scores = {
