@@ -6,7 +6,7 @@ import torch
 pytest.importorskip("executorch")  # the gaming PC installs without it
 
 from stylify_ml.data import MEAN, STD
-from stylify_ml.export import ParityError, check_parity, export_pte, main, write_metadata
+from stylify_ml.export import ParityError, check_parity, check_top1_agreement, export_pte, main, write_metadata
 from stylify_ml.labels import LABELS
 from stylify_ml.models import build_model, load_checkpoint, save_checkpoint
 
@@ -40,7 +40,8 @@ def test_metadata_has_the_spec_keys(tmp_path):
     on_disk = json.loads((tmp_path / "classifier.json").read_text())
     assert on_disk == meta
     assert set(on_disk) == {"labels", "inputSize", "resizeMode", "normalize", "threshold",
-                            "model", "run", "exportedAt", "scores"}
+                            "model", "run", "exportedAt", "scores", "quantized"}
+    assert on_disk["quantized"] is None
     assert on_disk["labels"] == list(LABELS) and on_disk["inputSize"] == 224 and on_disk["resizeMode"] == "stretch"
     assert on_disk["normalize"] == {"mean": [0.485, 0.456, 0.406], "std": [0.229, 0.224, 0.225]}
 
@@ -84,3 +85,41 @@ def test_export_run_rejects_checkpoint_with_different_labels(tmp_path):
 def test_export_uses_the_training_normalisation():
     import stylify_ml.export as export
     assert export.MEAN is MEAN and export.STD is STD
+
+
+def _confident_tiny() -> torch.nn.Module:
+    """A tiny model whose top-1 is clear (a large bias on label 3), so int8 rounding cannot flip it."""
+    model = _tiny(2)
+    with torch.no_grad():
+        model[3].bias.zero_()
+        model[3].bias[3] = 5.0
+    return model
+
+
+def test_int8_export_runs_and_agrees(tmp_path):
+    model = _confident_tiny()
+    torch.manual_seed(0)
+    inputs = torch.rand(8, 3, 224, 224)
+    n = export_pte(model, tmp_path / "q.pte", quantize=True, calibration=inputs)
+    assert n > 0
+    assert check_top1_agreement(tmp_path / "q.pte", model, inputs, min_agreement=0.75) >= 0.75
+
+
+def test_top1_agreement_error_when_models_differ(tmp_path):
+    export_pte(_confident_tiny(), tmp_path / "m.pte")
+    other = _tiny(3)
+    with torch.no_grad():
+        other[3].bias.zero_()
+        other[3].bias[5] = 5.0
+    with pytest.raises(ParityError):
+        check_top1_agreement(tmp_path / "m.pte", other, torch.rand(4, 3, 224, 224), min_agreement=0.9)
+
+
+def test_quantize_without_calibration_is_an_error(tmp_path):
+    with pytest.raises(ValueError, match="calibration"):
+        export_pte(tiny, tmp_path / "q.pte", quantize=True)
+
+
+def test_metadata_records_quantized(tmp_path):
+    write_metadata(tmp_path, threshold=0.7, model="m", run="r", scores={}, quantized="int8")
+    assert json.loads((tmp_path / "classifier.json").read_text())["quantized"] == "int8"

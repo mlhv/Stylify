@@ -342,3 +342,35 @@ def test_compare_without_executorch_shows_dash(tmp_path, monkeypatch):
     monkeypatch.setitem(sys.modules, "stylify_ml.export", None)  # import fails, as on the PC
     line = compare(tmp_path).splitlines()[1]
     assert line.split()[-1] == "-"
+
+
+def _fake_scores(monkeypatch, float_top1, int8_top1):
+    def score(pte_path, data, half):
+        top1 = int8_top1 if "int8" in str(pte_path) else float_top1
+        return {"n": 9, "top1": top1, "top3": 1.0}
+    monkeypatch.setattr(export, "score_pte", score)
+
+
+@needs_executorch
+def test_export_int8_refuses_when_accuracy_drops(tiny_run, tmp_path, monkeypatch):
+    data, run = tiny_run
+    if not (run / "metrics.json").exists():
+        evaluate(run, data)
+    _fake_scores(monkeypatch, 0.90, 0.85)
+    out = tmp_path / "out"
+    with pytest.raises(SystemExit):
+        export.main(["--run", str(run), "--out", str(out), "--int8", "--calibration-size", "9"])
+    assert not (out / "classifier.pte").exists()
+
+
+@needs_executorch
+def test_export_int8_writes_when_close(tiny_run, tmp_path, monkeypatch):
+    data, run = tiny_run
+    if not (run / "metrics.json").exists():
+        evaluate(run, data)
+    _fake_scores(monkeypatch, 0.90, 0.895)
+    monkeypatch.setattr(export, "check_top1_agreement", lambda *a, **k: 1.0)  # untrained: top-1 is noise
+    out = tmp_path / "out"
+    export.main(["--run", str(run), "--out", str(out), "--int8", "--calibration-size", "9"])
+    meta = json.loads((out / "classifier.json").read_text())
+    assert meta["quantized"] == "int8" and (out / "classifier.pte").stat().st_size > 0
