@@ -66,8 +66,9 @@ def balanced_sampler(dataset: ManifestDataset) -> WeightedRandomSampler:
     return WeightedRandomSampler(weights, num_samples=len(dataset), replacement=True)
 
 
-def load_personal(data: Path) -> list[tuple[Path, int]]:
-    root = Path(data) / "personal"
+def load_folder(data: Path, name: str) -> list[tuple[Path, int]]:
+    """Photos under data/<name>/<label>/, for the owner's evaluation sets (personal/, room/)."""
+    root = Path(data) / name
     if not root.is_dir():
         return []
     items: list[tuple[Path, int]] = []
@@ -75,9 +76,13 @@ def load_personal(data: Path) -> list[tuple[Path, int]]:
         if folder.name.startswith(".") or not folder.is_dir():
             continue
         if folder.name not in LABELS:
-            raise ValueError(f"personal/{folder.name} is not a label; expected one of {list(LABELS)}")
+            raise ValueError(f"{name}/{folder.name} is not a label; expected one of {list(LABELS)}")
         idx = label_index(folder.name)
         for f in sorted(folder.iterdir()):
             if not f.name.startswith(".") and f.is_file() and f.suffix.lower() in _EXTS:
                 items.append((f, idx))
     return items
+
+
+def load_personal(data: Path) -> list[tuple[Path, int]]:
+    return load_folder(data, "personal")

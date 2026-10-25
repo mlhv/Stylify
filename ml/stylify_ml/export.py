@@ -92,7 +92,8 @@ def _export_placeholder(out_dir: Path) -> None:
     torch.nn.init.zeros_(last.bias)
     _export_to(out_dir, model, torch.rand(2, 3, INPUT_SIZE, INPUT_SIZE), threshold=1.0, name="placeholder",
                run=None, scores={"valBalancedAccuracy": None, "personalTop1": None, "personalTop3": None,
-                                 "usersTop1": None, "usersTop3": None})
+                                 "usersTop1": None, "usersTop3": None, "carousellTop1": None,
+                                 "carousellTop3": None})
 
 
 def _run_data(run: Path, data: Path | None) -> Path:
@@ -125,6 +126,8 @@ def _export_run(run: Path, out_dir: Path, data: Path | None = None) -> None:
         "personalTop3": personal["top3"] if personal else None,
         "usersTop1": users["top1"] if users else None,
         "usersTop3": users["top3"] if users else None,
+        "carousellTop1": metrics["carousell"]["top1"] if metrics.get("carousell") else None,
+        "carousellTop3": metrics["carousell"]["top3"] if metrics.get("carousell") else None,
     }
     _export_to(out_dir, model, inputs, threshold=metrics["threshold"], name=meta["model"],
                run=run.name, scores=scores)

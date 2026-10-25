@@ -9,9 +9,9 @@ from PIL import Image
 
 from stylify_ml import export
 from stylify_ml import evaluate as evaluate_module
-from stylify_ml.evaluate import compare, evaluate, users_half
+from stylify_ml.evaluate import carousell_half, compare, evaluate, users_half
 from stylify_ml.labels import LABELS
-from stylify_ml.manifest import Row, write_manifest
+from stylify_ml.manifest import Row, read_manifest, write_manifest
 from stylify_ml.train import default_device, train
 
 COLOURS = [(220, 20, 20), (20, 220, 20), (20, 20, 220), (220, 220, 20), (220, 20, 220),
@@ -52,7 +52,8 @@ def test_train_then_evaluate_then_compare(tiny_run):
     assert config["data"] == str(data) and config["run_id"] == "t1" and config["device"] == "cpu"
     assert config["amp"] is False
     m = evaluate(run, data)
-    assert set(m) == {"val", "usersVal", "users", "personal", "threshold", "thresholdFrom", "pteBytes"}
+    assert set(m) == {"val", "usersVal", "users", "carousellVal", "carousell", "personal", "room", "threshold",
+                      "thresholdFrom", "thresholdCapped", "pteBytes"}
     assert 0.0 <= m["threshold"] <= 1.0 and m["personal"] is not None
     assert m["val"]["n"] == 9 and m["personal"]["n"] == 9
     assert m["usersVal"]["n"] + m["users"]["n"] == 9 and m["usersVal"]["n"] > 0 and m["users"]["n"] > 0
@@ -125,7 +126,8 @@ def test_export_run_writes_both_files(tiny_run, tmp_path):
                               "personalTop1": metrics["personal"]["top1"],
                               "personalTop3": metrics["personal"]["top3"],
                               "usersTop1": metrics["users"]["top1"],
-                              "usersTop3": metrics["users"]["top3"]}
+                              "usersTop3": metrics["users"]["top3"],
+                              "carousellTop1": None, "carousellTop3": None}
 
 
 def test_export_run_writes_nothing_when_parity_fails(tiny_run, tmp_path, monkeypatch):
@@ -196,3 +198,107 @@ def test_export_run_trained_elsewhere_finds_its_data(tiny_run, tmp_path):
     out = tmp_path / "out"
     export.main(["--run", str(moved), "--out", str(out)])
     assert (out / "classifier.pte").stat().st_size > 0
+
+
+def _with_carousell_and_room(data, tmp_path):
+    """A copy of the tiny data with Carousell test rows in both halves and a room/ folder."""
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy)
+    rows = read_manifest(copy / "manifest.csv")
+    want = {"carousellVal": [], "carousell": []}
+    i = 0
+    while min(len(v) for v in want.values()) < 9:
+        group = f"carousell:g{i}"
+        want[carousell_half(group)].append(group)
+        i += 1
+    for half, groups in want.items():
+        for (label, colour), group in zip(zip(LABELS, COLOURS), groups):
+            rel = f"crops/{label}_c_{half}.png"
+            Image.new("RGB", (64, 64), colour).save(copy / rel)
+            rows.append(Row(rel, label, "carousell", "test", group, "user"))
+    write_manifest(copy / "manifest.csv", rows)
+    for label, colour in zip(LABELS, COLOURS):
+        (copy / "room" / label).mkdir(parents=True)
+        Image.new("RGB", (64, 64), colour).save(copy / "room" / label / "r.jpg")
+    return copy
+
+
+def test_users_ignore_carousell_rows(tiny_run, tmp_path):
+    data, run = tiny_run
+    copy = _with_carousell_and_room(data, tmp_path)
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert m["usersVal"]["n"] + m["users"]["n"] == 9
+
+
+def test_carousell_halves_reported(tiny_run, tmp_path):
+    data, run = tiny_run
+    copy = _with_carousell_and_room(data, tmp_path)
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert m["carousellVal"]["n"] == 9 and m["carousell"]["n"] == 9
+    assert m["thresholdFrom"] == "usersVal+carousellVal"
+
+
+def test_threshold_without_carousell_falls_back(tiny_run, tmp_path):
+    data, run = tiny_run
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy)
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert m["thresholdFrom"] == "usersVal"
+    assert m["carousell"] is None and m["carousellVal"] is None
+
+
+def test_threshold_is_capped(tiny_run, tmp_path, monkeypatch):
+    data, run = tiny_run
+    copy = tmp_path / "data"
+    shutil.copytree(data, copy)
+    monkeypatch.setattr(evaluate_module, "pick_threshold", lambda p, t: 1.0)
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert m["threshold"] == 0.99 and m["thresholdCapped"] is True
+
+
+def test_room_folder_scored_when_present(tiny_run, tmp_path):
+    data, run = tiny_run
+    copy = _with_carousell_and_room(data, tmp_path)
+    m = evaluate(copy / "runs" / run.name, copy, device="cpu")
+    assert m["room"]["n"] == 9
+    plain = tmp_path / "plain"
+    shutil.copytree(data, plain)
+    assert evaluate(plain / "runs" / run.name, plain, device="cpu")["room"] is None
+
+
+def _write_run(data, name, *, users, carousell, recalls, val_bacc=0.9):
+    run = data / "runs" / name
+    run.mkdir(parents=True)
+    per_label = {label: {"precision": 1.0, "recall": 1.0, "support": 1} for label in LABELS}
+    for label, recall in recalls.items():
+        per_label[label]["recall"] = recall
+    summary = lambda top1: {"n": 10, "top1": top1, "top3": 1.0, "balanced_accuracy": top1, "per_label": per_label}
+    metrics = {"val": {"n": 10, "top1": val_bacc, "top3": 1.0, "balanced_accuracy": val_bacc, "per_label": per_label},
+               "usersVal": summary(users), "users": summary(users),
+               "carousellVal": summary(carousell) if carousell is not None else None,
+               "carousell": summary(carousell) if carousell is not None else None,
+               "personal": None, "room": None, "threshold": 0.7, "thresholdFrom": "usersVal",
+               "thresholdCapped": False, "pteBytes": 16_000_000}
+    if carousell is None:  # an old run, evaluated before Carousell
+        for key in ("carousellVal", "carousell", "room", "thresholdCapped"):
+            del metrics[key]
+    (run / "metrics.json").write_text(json.dumps(metrics))
+    (run / "config.json").write_text(json.dumps({"model_name": "efficientnet_b0"}))
+
+
+def test_compare_old_metrics_prints_dashes(tmp_path):
+    _write_run(tmp_path, "old", users=0.89, carousell=None, recalls={})
+    line = compare(tmp_path).splitlines()[1]
+    assert line.split()[0] == "old" and line.split()[4] == "-"  # carousell top1
+
+
+def test_compare_baseline_guard_and_winner(tmp_path):
+    _write_run(tmp_path, "base", users=0.89, carousell=0.70, recalls={"shoes": 0.99})
+    _write_run(tmp_path, "worse-shoes", users=0.90, carousell=0.85, recalls={"shoes": 0.96})
+    table = compare(tmp_path, baseline="base")
+    assert [l for l in table.splitlines() if l.startswith("worse-shoes")][0].split()[-1] == "acc-drop"
+    assert table.splitlines()[-1] == "winner: base"
+    _write_run(tmp_path, "good", users=0.90, carousell=0.85, recalls={"shoes": 0.98})
+    table = compare(tmp_path, baseline="base")
+    assert [l for l in table.splitlines() if l.startswith("good")][0].split()[-1] == "ok"
+    assert table.splitlines()[-1] == "winner: good"

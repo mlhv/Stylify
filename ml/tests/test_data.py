@@ -10,6 +10,7 @@ from stylify_ml.data import (
     balanced_sampler,
     eval_transform,
     load_image,
+    load_folder,
     load_personal,
     train_transform,
 )
@@ -88,3 +89,9 @@ def test_train_transform_crops_vary_on_elongated_images():
         red_share.append(red.sum().item() / max(1, (red | blue).sum().item()))
     assert max(red_share) - min(red_share) > 0.15
     assert any(r < 0.45 for r in red_share) and any(r > 0.55 for r in red_share)
+
+
+def test_load_folder_rejects_unknown_label(tmp_path):
+    (tmp_path / "room/socks").mkdir(parents=True)
+    with pytest.raises(ValueError, match="room/socks"):
+        load_folder(tmp_path, "room")
