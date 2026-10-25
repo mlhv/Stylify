@@ -7,12 +7,18 @@ import pytest
 import torch
 from PIL import Image
 
-from stylify_ml import export
+try:
+    from stylify_ml import export
+except ImportError:  # the gaming PC installs without ExecuTorch
+    export = None
 from stylify_ml import evaluate as evaluate_module
 from stylify_ml.evaluate import carousell_half, compare, evaluate, users_half
 from stylify_ml.labels import LABELS
 from stylify_ml.manifest import Row, read_manifest, write_manifest
+from stylify_ml import train as train_module
 from stylify_ml.train import default_device, train
+
+needs_executorch = pytest.mark.skipif(export is None, reason="ExecuTorch is not installed")
 
 COLOURS = [(220, 20, 20), (20, 220, 20), (20, 20, 220), (220, 220, 20), (220, 20, 220),
            (20, 220, 220), (240, 240, 240), (15, 15, 15), (128, 64, 0)]
@@ -42,6 +48,7 @@ def tiny_run(tmp_path_factory):
     return data, run
 
 
+@needs_executorch
 def test_train_then_evaluate_then_compare(tiny_run):
     data, run = tiny_run
     assert {"config.json", "epochs.jsonl", "best.pt"} <= {p.name for p in run.iterdir()}
@@ -111,6 +118,7 @@ def test_evaluate_without_personal(tiny_run, tmp_path):
     assert "-" in compare(copy).splitlines()[1].split()
 
 
+@needs_executorch
 def test_export_run_writes_both_files(tiny_run, tmp_path):
     data, run = tiny_run
     if not (run / "metrics.json").exists():
@@ -130,6 +138,7 @@ def test_export_run_writes_both_files(tiny_run, tmp_path):
                               "carousellTop1": None, "carousellTop3": None}
 
 
+@needs_executorch
 def test_export_run_writes_nothing_when_parity_fails(tiny_run, tmp_path, monkeypatch):
     data, run = tiny_run
     if not (run / "metrics.json").exists():
@@ -145,6 +154,7 @@ def test_export_run_writes_nothing_when_parity_fails(tiny_run, tmp_path, monkeyp
     assert not (out / "classifier.json").exists() and not (out / "classifier.pte").exists()
 
 
+@needs_executorch
 def test_placeholder_writes_nothing_when_parity_fails(tmp_path, monkeypatch):
     def fail(*args, **kwargs):
         raise export.ParityError("forced")
@@ -185,6 +195,7 @@ def test_train_and_evaluate_import_without_executorch():
     assert out.stdout.strip() == "False"
 
 
+@needs_executorch
 def test_export_run_trained_elsewhere_finds_its_data(tiny_run, tmp_path):
     data, run = tiny_run
     if not (run / "metrics.json").exists():
@@ -302,3 +313,32 @@ def test_compare_baseline_guard_and_winner(tmp_path):
     table = compare(tmp_path, baseline="base")
     assert [l for l in table.splitlines() if l.startswith("good")][0].split()[-1] == "ok"
     assert table.splitlines()[-1] == "winner: good"
+
+
+def test_train_records_source_weights_and_augment(tiny_run):
+    data, _ = tiny_run
+    run = train(data, "mobilenet_v3_large", head_epochs=1, full_epochs=0, batch_size=4, pretrained=False,
+                device="cpu", run_id="sw", workers=0, source_weights={"carousell": 3.0}, augment="strong")
+    config = json.loads((run / "config.json").read_text())
+    assert config["source_weights"] == {"carousell": 3.0} and config["augment"] == "strong"
+    shutil.rmtree(run)  # keep the shared fixture's runs/ to the one run other tests expect
+
+
+def test_parse_source_weight():
+    args = train_module.build_parser().parse_args(
+        ["--data", "d", "--model", "efficientnet_b0", "--source-weight", "carousell=4", "--source-weight", "web=0.5"])
+    assert args.source_weight == {"carousell": 4.0, "web": 0.5}
+    with pytest.raises(SystemExit):
+        train_module.build_parser().parse_args(["--data", "d", "--model", "efficientnet_b0", "--source-weight", "carousell"])
+
+
+def test_compare_without_executorch_shows_dash(tmp_path, monkeypatch):
+    _write_run(tmp_path, "r", users=0.9, carousell=0.8, recalls={})
+    metrics_path = tmp_path / "runs" / "r" / "metrics.json"
+    metrics = json.loads(metrics_path.read_text())
+    metrics["pteBytes"] = None
+    metrics_path.write_text(json.dumps(metrics))
+    (tmp_path / "runs" / "r" / "best.pt").write_bytes(b"x")
+    monkeypatch.setitem(sys.modules, "stylify_ml.export", None)  # import fails, as on the PC
+    line = compare(tmp_path).splitlines()[1]
+    assert line.split()[-1] == "-"

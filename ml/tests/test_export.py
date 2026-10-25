@@ -3,6 +3,8 @@ import json
 import pytest
 import torch
 
+pytest.importorskip("executorch")  # the gaming PC installs without it
+
 from stylify_ml.data import MEAN, STD
 from stylify_ml.export import ParityError, check_parity, export_pte, main, write_metadata
 from stylify_ml.labels import LABELS

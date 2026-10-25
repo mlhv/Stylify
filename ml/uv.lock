@@ -1680,7 +1680,6 @@ name = "stylify-ml"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "executorch" },
     { name = "numpy" },
     { name = "pillow" },
     { name = "pillow-heif" },
@@ -1693,10 +1692,12 @@ dependencies = [
 dev = [
     { name = "pytest" },
 ]
+export = [
+    { name = "executorch" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "executorch", specifier = "==1.5.1" },
     { name = "numpy", specifier = "==2.5.4" },
     { name = "pillow", specifier = "==13.0.0" },
     { name = "pillow-heif", specifier = "==1.8.1" },
@@ -1707,6 +1708,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = "==9.1.1" }]
+export = [{ name = "executorch", specifier = "==1.5.1" }]
 
 [[package]]
 name = "sympy"

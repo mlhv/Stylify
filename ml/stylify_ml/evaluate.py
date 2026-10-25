@@ -96,10 +96,13 @@ def evaluate(run: Path, data: Path, device: str | None = None) -> dict:
     return metrics
 
 
-def _pte_bytes(run: Path, metrics: dict) -> int:
-    """Export once to a temp file and cache the size in metrics.json."""
+def _pte_bytes(run: Path, metrics: dict) -> int | None:
+    """Export once to a temp file and cache the size in metrics.json. None where ExecuTorch is not installed."""
     if metrics.get("pteBytes") is None:
-        from stylify_ml.export import export_pte  # ExecuTorch is only installed where models are exported
+        try:
+            from stylify_ml.export import export_pte  # ExecuTorch is only installed where models are exported
+        except ImportError:
+            return None
 
         model, _ = load_checkpoint(run / "best.pt")
         with tempfile.TemporaryDirectory() as tmp:
@@ -128,8 +131,8 @@ def _accessory_recalls(metrics: dict) -> list[float | None]:
     return [per_label.get(label, {}).get("recall") for label in ACCESSORIES]
 
 
-def _verdict(metrics: dict, size: int, baseline: dict) -> str:
-    if size > MAX_PTE_BYTES:
+def _verdict(metrics: dict, size: int | None, baseline: dict) -> str:
+    if size is not None and size > MAX_PTE_BYTES:
         return "too-big"
     for mine, base in zip(_accessory_recalls(metrics), _accessory_recalls(baseline)):
         if mine is not None and base is not None and base - mine > MAX_ACCESSORY_DROP:
@@ -168,7 +171,7 @@ def compare(data: Path, baseline: str | None = None) -> str:
             _fmt(_top1(metrics, "room")),
             "/".join(_fmt(r) for r in _accessory_recalls(metrics)),
             _fmt(metrics["threshold"]),
-            f"{size / 1e6:.1f}",
+            f"{size / 1e6:.1f}" if size is not None else "-",
         )
         if base is not None:
             verdict = _verdict(metrics, size, base)

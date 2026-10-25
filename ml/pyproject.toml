@@ -7,7 +7,6 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "executorch==1.5.1",
     "numpy==2.5.4",
     "pillow==13.0.0",
     "pillow-heif==1.8.1",
@@ -27,3 +26,10 @@ module-root = ""
 dev = [
     "pytest==9.1.1",
 ]
+# Only `export` needs ExecuTorch. The gaming PC trains without it: `uv sync --no-group export`.
+export = [
+    "executorch==1.5.1",
+]
+
+[tool.uv]
+default-groups = ["dev", "export"]
