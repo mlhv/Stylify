@@ -61,7 +61,8 @@ def predict(model, loader, device) -> tuple[np.ndarray, np.ndarray]:
 def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e-3,
           full_epochs: int = 12, full_lr: float = 1e-4, batch_size: int = 64,
           label_smoothing: float = 0.1, pretrained: bool = True, device: str | None = None,
-          run_id: str | None = None, workers: int = 4, amp: bool | None = None) -> Path:
+          run_id: str | None = None, workers: int = 4, amp: bool | None = None,
+          source_weights: dict[str, float] | None = None, augment: str = "default") -> Path:
     """Train `model_name` on `data/manifest.csv` and return the run directory `data/runs/<run_id>/`.
 
     `amp` (float16 mixed precision) defaults to on for CUDA and must be off elsewhere.
@@ -80,17 +81,18 @@ def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e
         "data": str(data), "model_name": model_name, "head_epochs": head_epochs, "head_lr": head_lr,
         "full_epochs": full_epochs, "full_lr": full_lr, "batch_size": batch_size,
         "label_smoothing": label_smoothing, "pretrained": pretrained, "device": device,
-        "run_id": run_id, "workers": workers, "amp": amp,
+        "run_id": run_id, "workers": workers, "amp": amp, "source_weights": source_weights or {},
+        "augment": augment,
     }
     (run / "config.json").write_text(json.dumps(config, indent=2) + "\n")
 
-    train_ds = ManifestDataset(data, "train", train_transform())
+    train_ds = ManifestDataset(data, "train", train_transform(augment))
     val_ds = ManifestDataset(data, "val", eval_transform())
     if not len(train_ds) or not len(val_ds):
         raise ValueError(f"manifest needs train and val rows (train={len(train_ds)}, val={len(val_ds)})")
     # drop_last avoids a final batch of one, which BatchNorm in train mode rejects.
     loader_args = {"num_workers": workers, "pin_memory": cuda, "persistent_workers": workers > 0}
-    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=balanced_sampler(train_ds),
+    train_loader = DataLoader(train_ds, batch_size=batch_size, sampler=balanced_sampler(train_ds, source_weights),
                               drop_last=len(train_ds) > batch_size, **loader_args)
     val_loader = DataLoader(val_ds, batch_size=batch_size, **loader_args)
     scaler = torch.amp.GradScaler("cuda") if amp else None
@@ -128,7 +130,21 @@ def train(data: Path, model_name: str, head_epochs: int = 3, head_lr: float = 1e
     return run
 
 
-def main(argv: list[str] | None = None) -> None:
+def _source_weight(text: str) -> tuple[str, float]:
+    name, sep, value = text.partition("=")
+    if not sep or not name:
+        raise argparse.ArgumentTypeError(f"expected source=weight, got {text!r}")
+    return name, float(value)
+
+
+class _SourceWeights(argparse.Action):
+    def __call__(self, parser, namespace, value, option_string=None):
+        weights = dict(getattr(namespace, self.dest) or {})
+        weights[value[0]] = value[1]
+        setattr(namespace, self.dest, weights)
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--model", choices=MODEL_NAMES, required=True)
@@ -144,11 +160,19 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--amp", action=argparse.BooleanOptionalAction, default=None,
                         help="float16 mixed precision; default: on for cuda only")
-    args = parser.parse_args(argv)
+    parser.add_argument("--source-weight", type=_source_weight, action=_SourceWeights, default={},
+                        metavar="SOURCE=WEIGHT", help="oversample a source within each label (repeatable)")
+    parser.add_argument("--augment", choices=("default", "strong"), default="default")
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    args = build_parser().parse_args(argv)
     run = train(args.data, args.model, head_epochs=args.head_epochs, head_lr=args.head_lr,
                 full_epochs=args.full_epochs, full_lr=args.full_lr, batch_size=args.batch_size,
                 label_smoothing=args.label_smoothing, pretrained=not args.no_pretrained,
-                device=args.device, run_id=args.run_id, workers=args.workers, amp=args.amp)
+                device=args.device, run_id=args.run_id, workers=args.workers, amp=args.amp,
+                source_weights=args.source_weight, augment=args.augment)
     print(run)
 
 

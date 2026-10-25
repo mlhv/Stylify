@@ -34,14 +34,28 @@ def eval_transform() -> Callable[[Image.Image], torch.Tensor]:
     return T.Compose([T.Resize((224, 224)), T.ToTensor(), T.Normalize(MEAN, STD)])
 
 
-def train_transform() -> Callable[[Image.Image], torch.Tensor]:
-    return T.Compose([
-        T.Resize((256, 256)),  # stretch first, as the app does, so the crop sees the whole item
-        T.RandomResizedCrop(256, scale=(0.6, 1.0)),
-        T.RandomHorizontalFlip(),
-        T.ColorJitter(0.2, 0.2, 0.1),
-        eval_transform(),
-    ])
+def train_transform(strength: str = "default") -> Callable[[Image.Image], torch.Tensor]:
+    """"default" is the shipped recipe; "strong" adds tighter crops, small rotations, more colour change and
+    random erasing, for cluttered room photos."""
+    if strength == "default":
+        return T.Compose([
+            T.Resize((256, 256)),  # stretch first, as the app does, so the crop sees the whole item
+            T.RandomResizedCrop(256, scale=(0.6, 1.0)),
+            T.RandomHorizontalFlip(),
+            T.ColorJitter(0.2, 0.2, 0.1),
+            eval_transform(),
+        ])
+    if strength == "strong":
+        return T.Compose([
+            T.Resize((256, 256)),
+            T.RandomResizedCrop(256, scale=(0.35, 1.0)),
+            T.RandomHorizontalFlip(),
+            T.RandomRotation(15),
+            T.ColorJitter(0.3, 0.3, 0.2, 0.02),
+            eval_transform(),
+            T.RandomErasing(p=0.25),
+        ])
+    raise ValueError(f"unknown augmentation {strength!r}; expected 'default' or 'strong'")
 
 
 class ManifestDataset(Dataset):
@@ -58,12 +72,14 @@ class ManifestDataset(Dataset):
         return self.transform(load_image(self.data / row.path)), label_index(row.label)
 
 
-def balanced_sampler(dataset: ManifestDataset) -> WeightedRandomSampler:
-    counts: dict[str, int] = {}
+def balanced_sampler(dataset: ManifestDataset, source_weights: dict[str, float] | None = None) -> WeightedRandomSampler:
+    """Every label is drawn equally often. Within a label, a row's share is its source's weight (default 1)."""
+    weight_of = lambda r: (source_weights or {}).get(r.source, 1.0)
+    totals: dict[str, float] = {}
     for r in dataset.rows:
-        counts[r.label] = counts.get(r.label, 0) + 1
-    weights = [1.0 / counts[r.label] for r in dataset.rows]
-    return WeightedRandomSampler(weights, num_samples=len(dataset), replacement=True)
+        totals[r.label] = totals.get(r.label, 0.0) + weight_of(r)
+    weights = [weight_of(r) / totals[r.label] for r in dataset.rows]
+    return WeightedRandomSampler(weights, num_samples=len(dataset.rows), replacement=True)
 
 
 def load_folder(data: Path, name: str) -> list[tuple[Path, int]]:

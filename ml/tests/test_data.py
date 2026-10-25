@@ -95,3 +95,32 @@ def test_load_folder_rejects_unknown_label(tmp_path):
     (tmp_path / "room/socks").mkdir(parents=True)
     with pytest.raises(ValueError, match="room/socks"):
         load_folder(tmp_path, "room")
+
+
+class _Rows:
+    def __init__(self, rows):
+        self.rows = rows
+
+
+def _row(label, source):
+    return Row(f"crops/{label}/{source}.jpg", label, source, "train", "g", "shop")
+
+
+def test_sampler_keeps_labels_balanced_with_source_weights():
+    rows = [_row("top", "df2")] * 90 + [_row("top", "carousell")] * 10 + [_row("dress", "df2")] * 50
+    w = torch.as_tensor(balanced_sampler(_Rows(rows), {"carousell": 9}).weights)
+    top, carousell, dress = w[:100].sum(), w[90:100].sum(), w[100:].sum()
+    assert torch.isclose(top, dress)
+    assert torch.isclose(carousell, top / 2)
+
+
+def test_sampler_default_unchanged():
+    rows = [_row("top", "df2")] * 3 + [_row("top", "carousell")] + [_row("dress", "df2")] * 2
+    w = balanced_sampler(_Rows(rows)).weights.tolist()
+    assert w == pytest.approx([0.25] * 4 + [0.5] * 2)
+
+
+def test_strong_transform_shape():
+    assert train_transform("strong")(Image.new("RGB", (300, 200))).shape == (3, 224, 224)
+    with pytest.raises(ValueError):
+        train_transform("bogus")
