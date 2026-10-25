@@ -84,10 +84,11 @@ def test_near_duplicates_share_group_and_split():
     assert groups[2] != groups[0]
 
 
-def test_near_duplicates_cluster_transitively():
-    # a~b (2 bits), b~c (2 bits), a and c are 4 apart: still one group at max_distance 2
+def test_near_duplicates_do_not_chain():
+    # a~b (2 bits) and b~c (2 bits), but c is 4 bits from a: chaining would put all three in one group
     groups = near_duplicate_groups(["0000000000000000", "0000000000000003", "000000000000000f"], max_distance=2)
-    assert len(set(groups)) == 1
+    assert groups[0] == groups[1]
+    assert groups[2] != groups[0]
 
 
 def test_rerun_is_idempotent_and_keeps_other_rows(tmp_path):

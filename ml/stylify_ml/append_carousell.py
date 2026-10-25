@@ -44,31 +44,26 @@ def carousell_split(group: str) -> str:
     return "val" if position < TRAIN_FRACTION + VAL_FRACTION else "test"
 
 
-def near_duplicate_groups(hashes: list[str], max_distance: int = 6) -> list[str]:
-    """For each 64-bit hex hash, the smallest hash in its cluster (Hamming distance <= max_distance, transitive)."""
-    n = len(hashes)
-    parent = list(range(n))
+def near_duplicate_groups(hashes: list[str], max_distance: int = 4) -> list[str]:
+    """For each 64-bit hex hash, its group: the first earlier hash (a leader) within `max_distance` bits, else itself.
 
-    def find(i: int) -> int:
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-
-    if n:
-        bits = np.unpackbits(np.array([int(h, 16) for h in hashes], dtype=">u8").view(np.uint8).reshape(n, 8), axis=1)
-        for start in range(0, n, 512):
-            block = bits[start:start + 512]
-            distance = (block[:, None, :] != bits[None, :, :]).sum(axis=2)
-            for a, b in zip(*np.nonzero(distance <= max_distance)):
-                i, j = start + int(a), int(b)
-                if i < j:
-                    parent[find(j)] = find(i)
-    smallest: dict[int, str] = {}
+    Not transitive: chaining merged a thousand plain-background photos into one group.
+    """
+    if not hashes:
+        return []
+    bits = np.unpackbits(np.array([int(h, 16) for h in hashes], dtype=">u8").view(np.uint8).reshape(-1, 8), axis=1)
+    leaders: list[int] = []
+    groups: list[str] = []
     for i, h in enumerate(hashes):
-        root = find(i)
-        smallest[root] = min(smallest.get(root, h), h)
-    return [smallest[find(i)] for i in range(n)]
+        if leaders:
+            distance = (bits[leaders] != bits[i]).sum(axis=1)
+            nearest = int(distance.argmin())
+            if distance[nearest] <= max_distance:
+                groups.append(hashes[leaders[nearest]])
+                continue
+        leaders.append(i)
+        groups.append(h)
+    return groups
 
 
 def _collect(data: Path, min_side: int, counts: Counter) -> list[tuple[Path, str, str, tuple[int, int]]]:
