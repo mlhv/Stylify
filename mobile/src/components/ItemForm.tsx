@@ -13,7 +13,7 @@ import { ChunkyButton } from '@/components/ui/ChunkyButton'
 import { Txt } from '@/components/ui/Txt'
 import { TypeChip } from '@/components/ui/TypeChip'
 import { pickPhoto, type PhotoSource } from '@/lib/photo'
-import { decide } from '@/lib/suggestion'
+import { decide, type LineKind } from '@/lib/suggestion'
 import { useTypeSuggestion } from '@/lib/useTypeSuggestion'
 
 export type ItemFields = { name: string; type: string; size: string; color: string }
@@ -111,8 +111,8 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
   // Type suggestions. onResult reads the field when the classifier finishes, so a type typed in the meantime is kept.
   const [chips, setChips] = useState<string[]>([])
   const lastPrefill = useRef<string | null>(null)
-  // The latest run's top guess when it was sure of it, for the line above the chips; null when it was not.
-  const [sureGuess, setSureGuess] = useState<string | null>(null)
+  // What the line above the chips says about the latest run.
+  const [line, setLine] = useState<{ line: LineKind; guess: string | null }>({ line: 'unsure', guess: null })
   // setFieldValue does not run the field's validators, so an old error would stay under the new value.
   function setType(value: string) {
     form.setFieldValue('type', value)
@@ -125,11 +125,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
       setType(d.prefill)
       lastPrefill.current = d.prefill
     }
-    // Sure means the top confidence reached the threshold, judged as decide() judges it; unlike d.prefill,
-    // it does not depend on whether the field was open (a type typed during the run, or Edit's saved type).
-    const top = result.predictions[0]
-    const sure = result.threshold < 1 && top !== undefined && top.confidence >= result.threshold
-    setSureGuess(sure ? (d.chips[0] ?? null) : null)
+    setLine({ line: d.line, guess: d.guess })
     setChips(d.chips)
   })
 
@@ -222,7 +218,7 @@ export function ItemForm({ initial, currentImageUrl, submitLabel, footer, onSubm
                 ) : null}
                 {name === 'type' && (pending || chips.length) ? (
                   <View className="gap-1 pt-1">
-                    <ClassifierLine pending={pending} hasChips={chips.length > 0} guess={sureGuess} />
+                    <ClassifierLine pending={pending} hasChips={chips.length > 0} line={line.line} guess={line.guess} />
                     {!pending && chips.length ? (
                       <View className="flex-row flex-wrap gap-2">
                         {chips.map((chip, index) => (

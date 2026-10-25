@@ -13,19 +13,30 @@ import Animated, {
 } from 'react-native-reanimated'
 
 import { Txt } from '@/components/ui/Txt'
+import { lineText, type LineKind } from '@/lib/suggestion'
 
 const LINE = 'text-[15px]'
 
 /**
  * The classifier's line under the Type field: thinking while it runs, then what it made of the photo.
- * `guess` is the run's top guess when it was sure of it, or null when it was below the threshold.
+ * `line` and `guess` come from decide(): how sure the run was, and its top guess.
  */
-export function ClassifierLine({ pending, hasChips, guess }: { pending: boolean; hasChips: boolean; guess: string | null }) {
+export function ClassifierLine({
+  pending,
+  hasChips,
+  line,
+  guess,
+}: {
+  pending: boolean
+  hasChips: boolean
+  line: LineKind
+  guess: string | null
+}) {
   if (pending) return <Thinking />
   if (!hasChips) return null
   return (
     <Txt weight="heavy" className={LINE} accessibilityLiveRegion="polite">
-      {guess ? `Ooh, that looks like ${guess}!` : 'Not sure about this one. Which is it?'}
+      {lineText(line, guess)}
     </Txt>
   )
 }
