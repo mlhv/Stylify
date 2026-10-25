@@ -374,7 +374,7 @@ Expected: a table and a `winner:` line.
 Run: `cd ml && uv run python -I -m stylify_ml.score --pte <winner float .pte> ~/Downloads/IMG_9018.HEIC ~/Downloads/IMG_9019.HEIC ~/Downloads/IMG_9020.HEIC ~/Downloads/IMG_9021.HEIC` (export the winner to a scratchpad folder first), and look at its personal-set scores in the table.
 Expected: IMG_9019 is still trousers; no clear regression on personal. If there is one, look before going on and tell Minh.
 
-- [ ] **Step 4: Export.** If Task 7 is done: `export --run <winner> --out ../mobile/assets/model --int8`; if it refuses or Task 7 was dropped: `export --run <winner> --out ../mobile/assets/model`. If the winner is the baseline, skip this step (only the app change ships).
+- [ ] **Step 4: Export.** If Task 7 is done: `export --run <winner> --out ../mobile/assets/model --int8`, then run `score` on the four photos with the int8 `.pte` and re-export float if its top-1 differs from float's on more than one of them; if it refuses or Task 7 was dropped: `export --run <winner> --out ../mobile/assets/model`. If the winner is the baseline, skip this step (only the app change ships).
 - [ ] **Step 5: Mobile checks**
 
 Run: `cd mobile && bunx tsc --noEmit && bun test src`
