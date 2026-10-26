@@ -10,6 +10,7 @@ through `stylify_ml.jobqueue` within QUEUE_HOURS of the kernel starting, with it
 
 from __future__ import annotations
 
+import csv
 import json
 import os
 import shutil
@@ -65,6 +66,12 @@ def stage(inputs: Path, work: Path, tmp: Path) -> tuple[Path, Path, dict]:
         link = data / name
         if not link.exists():
             link.symlink_to(locate(inputs, name, tmp))
+    with (data / "manifest.csv").open(newline="") as f:
+        paths = [row["path"] for row in csv.DictReader(f)]
+    missing = [p for p in paths if not (data / p).is_file()]
+    if missing:  # an old crops upload with a new manifest: fail now, not inside the first epoch
+        raise FileNotFoundError(f"{len(missing)} of {len(paths)} crops in manifest.csv are not in the data, "
+                                f"e.g. {missing[0]}; upload crops.zip again")
     for name in ("runs", "logs"):
         (work / name).mkdir(parents=True, exist_ok=True)
         if not (data / name).exists():

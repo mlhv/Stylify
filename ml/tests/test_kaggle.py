@@ -133,3 +133,14 @@ def test_kernel_stages_a_job_list_and_keeps_logs(tmp_path):
     staged, _, job = stage(inputs, work, tmp_path / "tmp")
     assert job == {"jobs": jobs}
     assert (staged / "logs").resolve() == (work / "logs").resolve()
+
+
+def test_kernel_refuses_crops_missing_from_the_upload(staged, tmp_path):
+    data, out = staged
+    with (out / "data" / "manifest.csv").open("a") as f:  # a row added after the crops were uploaded
+        f.write("crops/dress/carousell-test-x.jpg,dress,carousell,test,carousell:x,user\n")
+    inputs = tmp_path / "input"
+    for name, slug in (("data", "stylify-data"), ("code", "stylify-ml-code")):
+        shutil.copytree(out / name, inputs / slug)
+    with pytest.raises(FileNotFoundError, match="1 of 2 crops"):
+        stage(inputs, tmp_path / "working", tmp_path / "tmp")
