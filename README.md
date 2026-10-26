@@ -15,6 +15,10 @@
 ![PyTorch](https://img.shields.io/badge/PyTorch-EE4C2C?logo=pytorch&logoColor=white)
 ![AWS](https://img.shields.io/badge/AWS_Lambda-FF9900?logo=awslambda&logoColor=white)
 
+<br/>
+
+<img src="docs/images/landing.png" alt="The Stylify landing page" width="100%"/>
+
 </div>
 
 ---
@@ -26,6 +30,8 @@
 - **One account everywhere.** Sign in with Kinde on either app; both talk to the same typed API.
 
 ## The classifier
+
+<img src="docs/images/iphone-add.jpg" alt="The iPhone app suggesting Top for a photo of a knit top on a bed" width="240" align="right"/>
 
 A 9-class model (top, outerwear, trousers, shorts, skirt, dress, shoes, hat, bag), fine-tuned from **EfficientNet-B0 in PyTorch** and exported to **ExecuTorch** to run on the iPhone (16 MB).
 
@@ -39,6 +45,8 @@ A 9-class model (top, outerwear, trousers, shorts, skirt, dress, shoes, hat, bag
 - The **confidence threshold is calibrated** so that at least 95% of the types it fills in confidently are right on held-out photos.
 
 The full pipeline (data preparation, training, evaluation, export) lives in [`ml/`](ml); the method and results are in [docs/ml.md](docs/ml.md).
+
+<br clear="right"/>
 
 ## Architecture
 
