@@ -24,15 +24,18 @@
       0.225
     ]
   },
-  "threshold": 0.7084821462631226,
+  "threshold": 0.662377655506134,
   "model": "efficientnet_b0",
-  "run": "20261022-180946-efficientnet_b0",
-  "exportedAt": "2026-10-22T20:43:35.450205+00:00",
+  "run": "20261026-kg-effb0-cw4",
+  "exportedAt": "2026-10-26T14:21:36.908386+00:00",
   "scores": {
-    "valBalancedAccuracy": 0.9302576807270219,
-    "personalTop1": 0.8125,
-    "personalTop3": 1.0,
-    "usersTop1": 0.8922462941847207,
-    "usersTop3": 0.9851767388825542
-  }
+    "valBalancedAccuracy": 0.9298506009390862,
+    "personalTop1": 0.75,
+    "personalTop3": 0.9375,
+    "usersTop1": 0.9133409350057012,
+    "usersTop3": 0.9908779931584949,
+    "carousellTop1": 0.9261880687563195,
+    "carousellTop3": 0.9898887765419616
+  },
+  "quantized": null
 }
