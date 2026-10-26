@@ -99,11 +99,37 @@ def test_kernel_stages_data_and_code(staged, tmp_path, unpacked):
         else:
             shutil.copytree(out / name, inputs / slug)
     work, tmp = tmp_path / "working", tmp_path / "tmp"
-    data, code, models = stage(inputs, work, tmp)
-    assert models == ["mobilenet_v3_large"]
+    data, code, job = stage(inputs, work, tmp)
+    assert job == {"models": ["mobilenet_v3_large"]}
     assert (data / "crops" / "top" / "a.jpg").is_file()
     assert (data / "personal" / "top" / "p.png").is_file()
     assert (data / "manifest.csv").is_file()
     assert (data / "runs").resolve() == (work / "runs").resolve()
     assert (code / "stylify_ml" / "train.py").is_file()
     assert stage(inputs, work, tmp)[0] == data  # a second call reuses what is there
+
+
+def test_bundle_carries_a_job_list(tmp_path):
+    data = _data(tmp_path)
+    jobs = [{"run_id": "r1", "args": ["--model", "efficientnet_b0", "--source-weight", "carousell=4"]}]
+    out = bundle(data, tmp_path / "out", "minh", ["efficientnet_b0"], jobs=jobs)
+    assert json.loads((out / "code" / "job.json").read_text()) == {"jobs": jobs}
+
+
+def test_bundle_rejects_a_job_with_a_bad_model(tmp_path):
+    data = _data(tmp_path)
+    with pytest.raises(ValueError, match="r1"):
+        bundle(data, tmp_path / "out", "minh", [], jobs=[{"run_id": "r1", "args": ["--model", "resnet50"]}])
+
+
+def test_kernel_stages_a_job_list_and_keeps_logs(tmp_path):
+    data = _data(tmp_path)
+    jobs = [{"run_id": "r1", "args": ["--model", "efficientnet_b0"]}]
+    out = bundle(data, tmp_path / "out", "minh", [], jobs=jobs)
+    inputs = tmp_path / "input"
+    for name, slug in (("data", "stylify-data"), ("code", "stylify-ml-code")):
+        shutil.copytree(out / name, inputs / slug)
+    work = tmp_path / "working"
+    staged, _, job = stage(inputs, work, tmp_path / "tmp")
+    assert job == {"jobs": jobs}
+    assert (staged / "logs").resolve() == (work / "logs").resolve()

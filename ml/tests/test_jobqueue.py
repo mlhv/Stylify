@@ -142,3 +142,12 @@ def test_second_queue_refuses_to_start(tmp_path):
         with pytest.raises(SystemExit, match="already running"):
             run_queue(tmp_path, _jobs("a"), runner=runner, now=runner.now)
         assert runner.calls == []
+
+
+def test_hours_sets_the_stop_time_from_now():
+    from stylify_ml.jobqueue import stop_time
+    start = datetime(2026, 10, 26, 22, 0)
+    assert stop_time(None, 10.5, now=lambda: start) == datetime(2026, 10, 27, 8, 30)  # past midnight is fine
+    assert stop_time(None, None, now=lambda: start) is None
+    with pytest.raises(ValueError, match="not both"):
+        stop_time(datetime(2026, 10, 26, 23, 0), 1, now=lambda: start)

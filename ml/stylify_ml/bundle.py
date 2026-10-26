@@ -46,14 +46,30 @@ def _write_json(path: Path, value: dict) -> None:
     path.write_text(json.dumps(value, indent=2) + "\n")
 
 
-def bundle(data: Path, out: Path, owner: str, models: list[str]) -> Path:
-    """Write out/data, out/code and out/kernel, each ready for the Kaggle CLI. Returns `out`."""
+def _check_jobs(jobs: list[dict]) -> None:
+    """Every job's args must parse as `stylify_ml.train` arguments, so a typo fails here and not hours in."""
+    from .train import build_parser  # imports torch; only needed with jobs
+
+    for job in jobs:
+        try:
+            build_parser().parse_args(["--data", "d", "--run-id", job["run_id"], *job["args"]])
+        except SystemExit:
+            raise ValueError(f"job {job['run_id']} has arguments train does not accept: {job['args']}") from None
+
+
+def bundle(data: Path, out: Path, owner: str, models: list[str], jobs: list[dict] | None = None) -> Path:
+    """Write out/data, out/code and out/kernel, each ready for the Kaggle CLI. Returns `out`.
+
+    With `jobs` (a sweep file's list), the kernel runs them through `stylify_ml.jobqueue` and `models` is unused.
+    """
     data, out = Path(data), Path(out)
     for required in (data / "manifest.csv", data / "crops"):
         if not required.exists():
             raise FileNotFoundError(f"{required} is missing; run prepare first")
     unknown = sorted(set(models) - set(MODEL_NAMES))
-    if not models or unknown:
+    if jobs:
+        _check_jobs(jobs)
+    elif not models or unknown:
         raise ValueError(f"models must be some of {list(MODEL_NAMES)}, got {models}")
     shutil.rmtree(out, ignore_errors=True)
     data_dir, code_dir, kernel_dir = out / "data", out / "code", out / "kernel"
@@ -69,7 +85,7 @@ def bundle(data: Path, out: Path, owner: str, models: list[str]) -> Path:
     with zipfile.ZipFile(code_dir / "stylify_ml.zip", "w", zipfile.ZIP_DEFLATED) as z:
         for path in sorted(PACKAGE.glob("*.py")):
             z.write(path, f"stylify_ml/{path.name}")
-    _write_json(code_dir / "job.json", {"models": models})
+    _write_json(code_dir / "job.json", {"jobs": jobs} if jobs else {"models": models})
     _write_json(code_dir / "dataset-metadata.json",
                 {"title": CODE_SLUG, "id": f"{owner}/{CODE_SLUG}", "licenses": [{"name": "other"}]})
 
@@ -100,8 +116,11 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--owner", required=True, help="Kaggle username")
     parser.add_argument("--models", nargs="+", default=["mobilenet_v3_large", "efficientnet_b0"],
                         choices=MODEL_NAMES)
+    parser.add_argument("--jobs", type=Path, default=None,
+                        help="a sweep file (e.g. sweeps/kaggle.json) to run instead of --models")
     args = parser.parse_args(argv)
-    print(bundle(args.data, args.out, args.owner, args.models))
+    jobs = json.loads(args.jobs.read_text()) if args.jobs else None
+    print(bundle(args.data, args.out, args.owner, args.models, jobs=jobs))
 
 
 if __name__ == "__main__":

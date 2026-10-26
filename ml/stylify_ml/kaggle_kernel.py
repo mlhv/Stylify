@@ -3,6 +3,9 @@
 Uses only the standard library, so it can find and unpack the code before importing it. Reads the
 private datasets that `stylify_ml.bundle` staged, works in /tmp (so the 1.7 GB of crops are not saved
 as kernel output), and writes one folder per run to /kaggle/working/runs/.
+
+job.json holds either {"models": [...]}, each trained with the defaults, or {"jobs": [...]}, a sweep file run
+through `stylify_ml.jobqueue` within QUEUE_HOURS of the kernel starting, with its logs in /kaggle/working/logs/.
 """
 
 from __future__ import annotations
@@ -12,8 +15,12 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 import zipfile
 from pathlib import Path
+
+# Kaggle stops a session at 12 hours and may then keep no output: start no job that would end after this.
+QUEUE_HOURS = 10.5
 
 
 def _find(root: Path, name: str, want_dir: bool) -> Path | None:
@@ -44,8 +51,8 @@ def locate(inputs: Path, name: str, tmp: Path) -> Path:
     return tmp / name
 
 
-def stage(inputs: Path, work: Path, tmp: Path) -> tuple[Path, Path, list[str]]:
-    """Lay out a --data folder and the code. Returns (data, code root for PYTHONPATH, models)."""
+def stage(inputs: Path, work: Path, tmp: Path) -> tuple[Path, Path, dict]:
+    """Lay out a --data folder and the code. Returns (data, code root for PYTHONPATH, job.json's contents)."""
     tmp.mkdir(parents=True, exist_ok=True)
     data = tmp / "data"
     data.mkdir(exist_ok=True)
@@ -58,20 +65,33 @@ def stage(inputs: Path, work: Path, tmp: Path) -> tuple[Path, Path, list[str]]:
         link = data / name
         if not link.exists():
             link.symlink_to(locate(inputs, name, tmp))
-    (work / "runs").mkdir(parents=True, exist_ok=True)
-    if not (data / "runs").exists():
-        (data / "runs").symlink_to(work / "runs")
+    for name in ("runs", "logs"):
+        (work / name).mkdir(parents=True, exist_ok=True)
+        if not (data / name).exists():
+            (data / name).symlink_to(work / name)
     code = locate(inputs, "stylify_ml", tmp / "src").parent
-    return data, code, json.loads(job.read_text())["models"]
+    return data, code, json.loads(job.read_text())
+
+
+def run_jobs(data: Path, tmp: Path, jobs: list[dict], hours: float, py: list[str], env: dict) -> int:
+    jobs_file = tmp / "jobs.json"
+    jobs_file.write_text(json.dumps(jobs))
+    return subprocess.run([*py, "stylify_ml.jobqueue", "--data", str(data), "--jobs", str(jobs_file),
+                           "--hours", f"{hours:.2f}"], env=env).returncode
 
 
 def main() -> int:
+    started = time.monotonic()
     inputs, work, tmp = Path("/kaggle/input"), Path("/kaggle/working"), Path("/tmp/stylify")
-    data, code, models = stage(inputs, work, tmp)
+    data, code, job = stage(inputs, work, tmp)
     env = {**os.environ, "PYTHONPATH": str(code)}
     py = [sys.executable, "-m"]
     subprocess.run(["nvidia-smi"], check=False)
     subprocess.run([*py, "pip", "install", "-q", "timm"], check=False)  # usually preinstalled
+    if "jobs" in job:
+        hours = QUEUE_HOURS - (time.monotonic() - started) / 3600
+        return run_jobs(data, tmp, job["jobs"], hours, py, env)
+    models = job["models"]
     failed = []
     for model in models:
         print(f"== {model}", flush=True)

@@ -96,13 +96,23 @@ def _stop_time(text: str) -> datetime:
     return datetime.now().replace(hour=hours, minute=minutes, second=0, microsecond=0)
 
 
+def stop_time(stop_at: datetime | None, hours: float | None,
+              now: Callable[[], datetime] = datetime.now) -> datetime | None:
+    """The queue's stop time: --stop-at as given, or --hours from now (which may pass midnight)."""
+    if stop_at is not None and hours is not None:
+        raise ValueError("give --stop-at or --hours, not both")
+    return now() + timedelta(hours=hours) if hours is not None else stop_at
+
+
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--jobs", type=Path, required=True, help="JSON list of jobs, e.g. sweeps/sweep.json")
     parser.add_argument("--stop-at", type=_stop_time, default=None, help="HH:MM today: start no job that cannot finish")
+    parser.add_argument("--hours", type=float, default=None, help="like --stop-at, but this many hours from now")
     args = parser.parse_args(argv)
-    run_queue(args.data.expanduser().resolve(), json.loads(args.jobs.read_text()), stop_at=args.stop_at)
+    run_queue(args.data.expanduser().resolve(), json.loads(args.jobs.read_text()),
+              stop_at=stop_time(args.stop_at, args.hours))
 
 
 if __name__ == "__main__":
