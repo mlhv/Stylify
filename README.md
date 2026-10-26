@@ -31,14 +31,16 @@
 
 ## The classifier
 
-<img src="docs/images/iphone-add.jpg" alt="The iPhone app suggesting Top for a photo of a knit top on a bed" width="240" align="right"/>
+<table>
+<tr>
+<td valign="top">
 
 A 9-class model (top, outerwear, trousers, shorts, skirt, dress, shoes, hat, bag), fine-tuned from **EfficientNet-B0 in PyTorch** and exported to **ExecuTorch** to run on the iPhone (16 MB).
 
-| | Old model | Current model |
+| Held-out test photos | Old model | Current model |
 |---|---|---|
-| Photos taken in ordinary rooms (989 held out) | 0.788 | **0.926** |
-| Volunteers' own photos (1,754 held out) | 0.892 | **0.913** |
+| Taken in ordinary rooms (989) | 0.788 | **0.926** |
+| Volunteers' own photos (1,754) | 0.892 | **0.913** |
 
 - Trained on **127K images from 8 public datasets**, with room photos oversampled so the model learns clothes on beds, floors and hangers, not just on models.
 - A **five-run sweep on Kaggle GPUs** picked the source weighting and learning rate.
@@ -46,7 +48,12 @@ A 9-class model (top, outerwear, trousers, shorts, skirt, dress, shoes, hat, bag
 
 The full pipeline (data preparation, training, evaluation, export) lives in [`ml/`](ml); the method and results are in [docs/ml.md](docs/ml.md).
 
-<br clear="right"/>
+</td>
+<td width="240" valign="top">
+<img src="docs/images/iphone-add.jpg" alt="The iPhone app suggesting Top for a photo of a knit top on a bed" width="240"/>
+</td>
+</tr>
+</table>
 
 ## Architecture
 
